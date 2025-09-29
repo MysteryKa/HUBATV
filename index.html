@@ -95,7 +95,18 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // COLE AQUI A CONFIGURAÇÃO DO SEU FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUNlXKaxyBjqqHR6IkbldwZoDg7P_38co",
+            authDomain: "portal-de-atividades-mjf.firebaseapp.com",
+            projectId: "portal-de-atividades-mjf",
+            storageBucket: "portal-de-atividades-mjf.appspot.com",
+            messagingSenderId: "49392129357",
+            appId: "1:49392129357:web:999edc7ca73cb78a36d304",
+            measurementId: "G-5YSFM0SXFN"
+        };
+        // FIM DA ÁREA DE CONFIGURAÇÃO
+
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'portal-acompanhamento-v2';
         
@@ -336,7 +347,7 @@
         
         function handleAnswer(selectedAnswer) {
             const task = state.currentActivity.tasks[state.currentTaskIndex];
-            if (!task) return; // Adicionado para segurança
+            if (!task) return; 
             const isCorrect = String(selectedAnswer) === String(task.answer);
             state.sessionResults.push({ task, selectedAnswer, isCorrect });
 
