@@ -101,17 +101,20 @@
         
         let app, db, auth;
 
-        // CORREÇÃO: Inicializa o Firebase apenas se a configuração for válida
-        if (firebaseConfig && firebaseConfig.projectId) {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-        } else {
-            console.warn("Configuração do Firebase não encontrada. A aplicação funcionará em modo offline.");
+        try {
+            if (firebaseConfig && firebaseConfig.projectId) {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                signInFirebase();
+            } else {
+                console.warn("Configuração do Firebase não encontrada. A aplicação funcionará em modo offline.");
+            }
+        } catch (error) {
+            console.error("Erro ao inicializar o Firebase:", error);
         }
 
         async function signInFirebase() {
-            // CORREÇÃO: Tenta autenticar apenas se o auth foi inicializado
             if (auth) {
                 try {
                     if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
@@ -119,7 +122,6 @@
                 } catch (error) { console.error("Firebase auth error:", error); }
             }
         }
-        signInFirebase();
         
         // --- BANCO DE ATIVIDADES E HABILIDADES ---
         const skills = {
@@ -136,9 +138,9 @@
                 description: 'Uma avaliação com 20 questões progressivas para sondagem de habilidades básicas.',
                 tasks: [
                     { type: 'recognize', instruction: 'Toque no número 5', answer: 5, options: [3, 8, 5], skillId: 'S1' },
-                    { type: 'count', instruction: 'Quantos sóis você vê?', quantity: 4, options: [4, 2, 6], skillId: 'S1' },
-                    { type: 'count', instruction: 'Quantas luas você vê?', quantity: 8, options: [7, 8, 9], skillId: 'S1' },
-                    { type: 'match', instruction: 'Toque no número que representa as estrelas', quantity: 7, options: [5, 7, 9], skillId: 'S1' },
+                    { type: 'count', instruction: 'Quantos sóis você vê?', quantity: 4, answer: 4, options: [4, 2, 6], skillId: 'S1' },
+                    { type: 'count', instruction: 'Quantas luas você vê?', quantity: 8, answer: 8, options: [7, 8, 9], skillId: 'S1' },
+                    { type: 'match', instruction: 'Toque no número que representa as estrelas', quantity: 7, answer: 7, options: [5, 7, 9], skillId: 'S1' },
                     { type: 'compare', instruction: 'Qual lado tem MAIS?', quantities: [6, 3], answer: 'left', skillId: 'S1' },
                     { type: 'operation', instruction: 'Quanto é?', quantities: [3, 2], op: '+', answer: 5, options: [4, 5, 6], skillId: 'S2' },
                     { type: 'operation', instruction: 'Quanto é?', quantities: [5, 4], op: '+', answer: 9, options: [8, 1, 9], skillId: 'S2' },
@@ -203,10 +205,8 @@
             const listEl = document.getElementById('activities-list');
             listEl.innerHTML = '<p>Carregando histórico...</p>';
             
-            // CORREÇÃO: Verifica se o db existe antes de fazer a query
             if (!db) {
                 listEl.innerHTML = '<p class="text-red-500">Erro de conexão. Relatórios indisponíveis.</p>';
-                // Mesmo sem DB, mostra as atividades como não iniciadas
                 activities.forEach(activity => {
                     const card = document.createElement('div');
                     card.className = 'bg-gray-100 p-4 rounded-lg flex justify-between items-center';
@@ -214,11 +214,7 @@
                         <div>
                             <h3 class="font-bold text-lg text-gray-800">${activity.title}</h3>
                             <p class="text-sm text-gray-600">${activity.description}</p>
-                        </div>
-                        <div class="text-right">
-                           <p class="font-semibold text-gray-500">Não iniciado</p>
-                        </div>
-                    `;
+                        </div>`;
                     const startButton = document.createElement('button');
                     startButton.textContent = 'Iniciar';
                     startButton.className = `ml-4 px-4 py-2 rounded text-white font-semibold bg-blue-500 hover:bg-blue-400`;
@@ -340,6 +336,7 @@
         
         function handleAnswer(selectedAnswer) {
             const task = state.currentActivity.tasks[state.currentTaskIndex];
+            if (!task) return; // Adicionado para segurança
             const isCorrect = String(selectedAnswer) === String(task.answer);
             state.sessionResults.push({ task, selectedAnswer, isCorrect });
 
@@ -362,7 +359,6 @@
         }
 
         async function finishActivity() {
-             // CORREÇÃO: Verifica se auth e db existem antes de salvar
              if (auth && auth.currentUser && db) {
                 try {
                     await addDoc(collection(db, `artifacts/${appId}/public/data/atividades`), {
@@ -424,10 +420,12 @@
                 const students = {};
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    if (!students[data.studentName]) {
-                        students[data.studentName] = [];
+                    if (data && data.studentName && data.timestamp) {
+                        if (!students[data.studentName]) {
+                            students[data.studentName] = [];
+                        }
+                        students[data.studentName].push(data);
                     }
-                    students[data.studentName].push(data);
                 });
 
                 listDiv.innerHTML = '';
@@ -485,17 +483,20 @@
 
         function renderPrintableReport(data) {
             const reportContainer = document.getElementById('printable-report');
-            const correctCount = data.results.filter(r => r.isCorrect).length;
+            const results = data.results || [];
+            const correctCount = results.filter(r => r.isCorrect).length;
             
             const skillsInDifficulty = {};
-            data.results.forEach(res => {
-                if(!res.isCorrect) {
-                    const skill = skills[res.task.skillId];
-                    if(skill && !skillsInDifficulty[skill.saeb]) {
-                        skillsInDifficulty[skill.saeb] = skill;
+            if (Array.isArray(results)) {
+                results.forEach(res => {
+                    if(res && !res.isCorrect && res.task && res.task.skillId) {
+                        const skill = skills[res.task.skillId];
+                        if(skill && !skillsInDifficulty[skill.saeb]) {
+                            skillsInDifficulty[skill.saeb] = skill;
+                        }
                     }
-                }
-            });
+                });
+            }
 
             let reportHTML = `
                 <div class="p-8">
@@ -510,7 +511,7 @@
                         </div>
                         <div class="text-right">
                             <p class="font-bold">Resultado Final</p>
-                            <p class="text-2xl font-bold">${correctCount} / ${data.results.length} Acertos</p>
+                            <p class="text-2xl font-bold">${correctCount} / ${results.length} Acertos</p>
                         </div>
                     </div>
 
@@ -539,12 +540,12 @@
                              </tr>
                            </thead>
                            <tbody>
-                            ${data.results.map((res, index) => `
+                            ${(results).map((res, index) => `
                                 <tr class="${res.isCorrect ? '' : 'bg-red-50'}">
                                     <td class="border p-2 font-semibold">${index + 1}</td>
-                                    <td class="border p-2">${res.task.instruction}</td>
-                                    <td class="border p-2">${res.selectedAnswer}</td>
-                                    <td class="border p-2">${res.task.answer}</td>
+                                    <td class="border p-2">${res.task ? res.task.instruction : 'N/A'}</td>
+                                    <td class="border p-2">${res.selectedAnswer || 'N/A'}</td>
+                                    <td class="border p-2">${res.task ? res.task.answer : 'N/A'}</td>
                                     <td class="border p-2 text-center text-xl">${res.isCorrect ? '✔️' : '❌'}</td>
                                 </tr>
                             `).join('')}
