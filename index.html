@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Acompanhamento Individualizado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f0f4f8;
+            color: #1a202c;
+        }
+        .btn-answer {
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+        .btn-answer:active {
+            transform: scale(0.95);
+        }
+        .feedback-correct { animation: flash-green 0.7s; }
+        @keyframes flash-green { 50% { background-color: #c6f6d5; } }
+        .feedback-incorrect { animation: flash-red 0.7s; }
+        @keyframes flash-red { 50% { background-color: #fed7d7; } }
+        .progress-bar-fill { transition: width 0.5s ease; }
+        
+        /* Estilos para Impressão */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-report, #printable-report * {
+                visibility: visible;
+            }
+            #printable-report {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-2 md:p-4">
+
+    <div id="app-container" class="w-full max-w-4xl mx-auto no-print">
+
+        <!-- TELA DE LOGIN -->
+        <div id="login-screen" class="bg-white p-8 rounded-2xl shadow-xl text-center">
+            <h1 class="text-3xl font-bold text-blue-600 mb-2">Portal de Acompanhamento</h1>
+            <p class="text-gray-500 mb-8">Acesse as atividades ou os relatórios.</p>
+            <input type="text" id="student-name-input" placeholder="Nome do Aluno(a)" class="w-full max-w-sm mx-auto bg-gray-100 border-2 border-gray-300 text-gray-800 text-center text-lg rounded-lg p-3 mb-6 focus:outline-none focus:border-blue-500 transition-colors">
+            <button id="login-btn" class="mt-2 w-full max-w-sm mx-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-transform hover:scale-105">Acessar Atividades</button>
+            <button id="show-dashboard-btn" class="mt-4 text-gray-500 hover:text-gray-800">Painel do Professor</button>
+        </div>
+        
+        <!-- HUB DE ATIVIDADES DO ALUNO -->
+        <div id="student-hub-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl">
+            <h1 id="hub-welcome-message" class="text-3xl font-bold text-gray-800 mb-6"></h1>
+            <div id="activities-list" class="space-y-4"></div>
+            <button id="hub-logout-btn" class="mt-8 text-gray-500 hover:text-gray-800">Sair</button>
+        </div>
+
+        <!-- TELA DE ATIVIDADE -->
+        <div id="activity-screen" class="hidden bg-white p-6 rounded-2xl shadow-xl">
+             <!-- Conteúdo da atividade (gerado dinamicamente) -->
+        </div>
+        
+        <!-- TELA DE FIM DE SESSÃO -->
+        <div id="end-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl text-center">
+             <!-- Conteúdo de fim de sessão (gerado dinamicamente) -->
+        </div>
+
+        <!-- PAINEL DO PROFESSOR -->
+        <div id="dashboard-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl">
+             <div id="dashboard-main">
+                <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">Painel do Professor</h1>
+                <div id="student-list" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
+             </div>
+             <button id="back-to-start-btn" class="mt-8 text-gray-500 hover:text-gray-800 mx-auto block">Voltar ao Início</button>
+        </div>
+    </div>
+    
+    <!-- ÁREA DE IMPRESSÃO (Fora do container principal) -->
+    <div id="printable-report" class="bg-white"></div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'portal-acompanhamento-v2';
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        async function signInFirebase() {
+            try {
+                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                else await signInAnonymously(auth);
+            } catch (error) { console.error("Firebase auth error:", error); }
+        }
+        signInFirebase();
+        
+        // --- BANCO DE ATIVIDADES E HABILIDADES ---
+        const skills = {
+            S1: { saeb: 'D19', bncc: 'EF01MA01', desc: 'Contar e reconhecer números naturais.' },
+            S2: { saeb: 'D19', bncc: 'EF01MA06', desc: 'Resolver problemas de adição e subtração com suporte visual.' },
+            S3: { saeb: 'D20', bncc: 'EF02MA04', desc: 'Compreender o sistema de numeração decimal (unidades e dezenas).' },
+            S4: { saeb: 'D21', bncc: 'EF03MA02', desc: 'Compreender o sistema de numeração decimal (centenas) e realizar operações.' },
+        };
+
+        const activities = [
+            {
+                id: 'diagnostico_inicial_20',
+                title: 'Diagnóstico Inicial de Numeramento',
+                description: 'Uma avaliação com 20 questões progressivas para sondagem de habilidades básicas.',
+                tasks: [
+                    { type: 'recognize', instruction: 'Toque no número 5', answer: 5, options: [3, 8, 5], skillId: 'S1' },
+                    { type: 'count', instruction: 'Quantos sóis você vê?', quantity: 4, options: [4, 2, 6], skillId: 'S1' },
+                    { type: 'count', instruction: 'Quantas luas você vê?', quantity: 8, options: [7, 8, 9], skillId: 'S1' },
+                    { type: 'match', instruction: 'Toque no número que representa as estrelas', quantity: 7, options: [5, 7, 9], skillId: 'S1' },
+                    { type: 'compare', instruction: 'Qual lado tem MAIS?', quantities: [6, 3], answer: 'left', skillId: 'S1' },
+                    { type: 'operation', instruction: 'Quanto é?', quantities: [3, 2], op: '+', answer: 5, options: [4, 5, 6], skillId: 'S2' },
+                    { type: 'operation', instruction: 'Quanto é?', quantities: [5, 4], op: '+', answer: 9, options: [8, 1, 9], skillId: 'S2' },
+                    { type: 'operation', instruction: 'Quanto resta?', quantities: [6, 2], op: '-', answer: 4, options: [8, 3, 4], skillId: 'S2' },
+                    { type: 'operation', instruction: 'Quanto resta?', quantities: [9, 5], op: '-', answer: 4, options: [4, 5, 14], skillId: 'S2' },
+                    { type: 'operation', instruction: 'Quanto é?', quantities: [7, 3], op: '+', answer: 10, options: [4, 9, 10], skillId: 'S2' },
+                    { type: 'recognize', instruction: 'Toque no número 14', answer: 14, options: [41, 24, 14], skillId: 'S3' },
+                    { type: 'placeValue', instruction: 'Que número é este?', answer: 23, values: { tens: 2, ones: 3 }, options: [32, 23, 5], skillId: 'S3' },
+                    { type: 'placeValue', instruction: 'Que número é este?', answer: 41, values: { tens: 4, ones: 1 }, options: [14, 41, 50], skillId: 'S3' },
+                    { type: 'operation', instruction: 'Quanto é?', quantities: [10, 6], op: '+', answer: 16, options: [4, 16, 106], skillId: 'S3' },
+                    { type: 'operation', instruction: 'Quanto resta?', quantities: [20, 5], op: '-', answer: 15, options: [25, 10, 15], skillId: 'S3' },
+                    { type: 'placeValue', instruction: 'Que número é este?', answer: 125, values: { hundreds: 1, tens: 2, ones: 5 }, options: [152, 215, 125], skillId: 'S4' },
+                    { type: 'placeValue', instruction: 'Que número é este?', answer: 304, values: { hundreds: 3, tens: 0, ones: 4 }, options: [340, 403, 304], skillId: 'S4' },
+                    { type: 'operation', instruction: 'Quanto é?', quantities: [22, 13], op: '+', answer: 35, options: [35, 25, 19], skillId: 'S4' },
+                    { type: 'operation', instruction: 'Quanto é?', quantities: [16, 7], op: '+', answer: 23, options: [13, 23, 24], skillId: 'S4' },
+                    { type: 'recognize', instruction: 'Toque no número 1000', answer: 1000, options: [100, 10, 1000], skillId: 'S4' }
+                ]
+            },
+            // Adicione mais objetos de atividade aqui no futuro!
+        ];
+
+        const state = {
+            studentName: "",
+            currentActivity: null,
+            currentTaskIndex: 0,
+            sessionResults: [],
+        };
+        
+        const screens = {
+            login: document.getElementById('login-screen'),
+            studentHub: document.getElementById('student-hub-screen'),
+            activity: document.getElementById('activity-screen'),
+            end: document.getElementById('end-screen'),
+            dashboard: document.getElementById('dashboard-screen')
+        };
+        
+        // --- FUNÇÕES DE LÓGICA PRINCIPAL ---
+        function switchScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.add('hidden'));
+            if(screens[screenName]) screens[screenName].classList.remove('hidden');
+        }
+
+        function login() {
+            const studentName = document.getElementById('student-name-input').value.trim();
+            if (studentName) {
+                state.studentName = studentName;
+                renderStudentHub();
+                switchScreen('studentHub');
+            } else {
+                alert("Por favor, preencha o nome do aluno.");
+            }
+        }
+
+        function logout() {
+            state.studentName = "";
+            document.getElementById('student-name-input').value = '';
+            switchScreen('login');
+        }
+
+        async function renderStudentHub(name = state.studentName) {
+            document.getElementById('hub-welcome-message').textContent = `Atividades de ${name}`;
+            const listEl = document.getElementById('activities-list');
+            listEl.innerHTML = '<p>Carregando histórico...</p>';
+            
+            const q = query(collection(db, `artifacts/${appId}/public/data/atividades`), where("studentName", "==", name));
+            onSnapshot(q, (snapshot) => {
+                const completedActivities = {};
+                
+                // Filtra documentos que ainda não têm timestamp e depois ordena
+                const docs = snapshot.docs.map(doc => doc.data()).filter(data => data.timestamp);
+                docs.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
+
+                docs.forEach(data => {
+                    // A verificação acima garante que data.timestamp existe
+                    if (!completedActivities[data.activityId]) {
+                        completedActivities[data.activityId] = data.timestamp.toDate();
+                    }
+                });
+
+                listEl.innerHTML = '';
+                activities.forEach(activity => {
+                    const isCompleted = !!completedActivities[activity.id];
+                    const completionDate = isCompleted ? completedActivities[activity.id].toLocaleDateString('pt-BR') : '';
+                    
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-100 p-4 rounded-lg flex justify-between items-center';
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${activity.title}</h3>
+                            <p class="text-sm text-gray-600">${activity.description}</p>
+                        </div>
+                        <div class="text-right">
+                            ${isCompleted ? 
+                                `<p class="font-semibold text-green-600">Concluído</p><p class="text-xs text-gray-500">${completionDate}</p>` : 
+                                '<p class="font-semibold text-gray-500">Não iniciado</p>'
+                            }
+                        </div>
+                    `;
+                    const startButton = document.createElement('button');
+                    startButton.textContent = isCompleted ? 'Refazer' : 'Iniciar';
+                    startButton.className = `ml-4 px-4 py-2 rounded text-white font-semibold ${isCompleted ? 'bg-yellow-500 hover:bg-yellow-400' : 'bg-blue-500 hover:bg-blue-400'}`;
+                    startButton.onclick = () => startActivity(activity.id);
+
+                    const cardContent = card.querySelector('div');
+                    card.insertBefore(startButton, cardContent.nextSibling);
+
+                    listEl.appendChild(card);
+                });
+            });
+        }
+        
+        function startActivity(activityId) {
+            state.currentActivity = activities.find(a => a.id === activityId);
+            state.currentTaskIndex = 0;
+            state.sessionResults = [];
+            renderActivityScreen();
+            switchScreen('activity');
+            renderTask();
+        }
+
+        function renderActivityScreen() {
+            screens.activity.innerHTML = `
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-lg text-gray-700">${state.studentName}</span>
+                        <span class="text-gray-500">Questão <span id="question-counter">1</span> de ${state.currentActivity.tasks.length}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div id="progress-bar" class="bg-blue-500 h-4 rounded-full progress-bar-fill" style="width: 5%"></div>
+                    </div>
+                </div>
+                <p id="instruction-text" class="text-2xl font-semibold text-center text-gray-700 h-16 my-4"></p>
+                <div id="task-container" class="my-6 min-h-[200px] flex items-center justify-center gap-4 flex-wrap"></div>
+                <div id="options-container" class="mt-6 flex flex-wrap justify-center gap-4"></div>
+            `;
+        }
+        
+        function renderTask() {
+            const task = state.currentActivity.tasks[state.currentTaskIndex];
+            const instructionEl = document.getElementById('instruction-text');
+            const taskContainer = document.getElementById('task-container');
+            const optionsContainer = document.getElementById('options-container');
+            
+            instructionEl.textContent = task.instruction;
+            taskContainer.innerHTML = '';
+            optionsContainer.innerHTML = '';
+            
+            const itemMap = {1:'sun', 2:'sun', 3:'moon', 4:'star', 5:'star', 6:'apple', 7:'apple', 8:'ball', 9:'ball', 10:'ball', 18: 'apple', 19:'apple' };
+            const itemType = itemMap[state.currentTaskIndex + 1] || 'star';
+
+            if (task.type === 'count' || task.type === 'match') {
+                taskContainer.innerHTML = createVisual(itemType).repeat(task.quantity);
+            }
+            if (task.type === 'operation') {
+                const opSymbol = task.op === '+' ? '+' : '−';
+                taskContainer.innerHTML = `<div class="flex items-center gap-4 text-5xl font-bold"><div class="flex gap-2 flex-wrap justify-center">${createVisual(itemType).repeat(task.quantities[0])}</div><span>${opSymbol}</span><div class="flex gap-2 flex-wrap justify-center">${createVisual(itemType).repeat(task.quantities[1])}</div><span>=</span><span>?</span></div>`;
+            }
+            if (task.type === 'compare') {
+                taskContainer.innerHTML = `<button data-answer="left" class="btn-answer bg-white p-4 rounded-lg flex flex-wrap justify-center gap-2">${createVisual(itemType).repeat(task.quantities[0])}</button><div class="text-3xl font-bold">ou</div><button data-answer="right" class="btn-answer bg-white p-4 rounded-lg flex flex-wrap justify-center gap-2">${createVisual(itemType).repeat(task.quantities[1])}</button>`;
+            }
+            if (task.type === 'placeValue') {
+                let visuals = (createVisual('hundred').repeat(task.values.hundreds || 0)) + (createVisual('ten').repeat(task.values.tens || 0)) + (createVisual('one').repeat(task.values.ones || 0));
+                taskContainer.innerHTML = visuals;
+            }
+            if (task.options) {
+                task.options.forEach(opt => {
+                    optionsContainer.innerHTML += `<button data-answer="${opt}" class="btn-answer bg-blue-500 text-white text-5xl font-bold rounded-2xl p-6 shadow-md">${opt}</button>`;
+                });
+            }
+            
+            document.querySelectorAll('[data-answer]').forEach(el => {
+                el.onclick = (e) => handleAnswer(e.currentTarget.dataset.answer);
+            });
+        }
+        
+        function handleAnswer(selectedAnswer) {
+            const task = state.currentActivity.tasks[state.currentTaskIndex];
+            const isCorrect = String(selectedAnswer) === String(task.answer);
+            state.sessionResults.push({ task, selectedAnswer, isCorrect });
+
+            const body = document.querySelector('body');
+            body.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+            
+            setTimeout(() => {
+                body.classList.remove('feedback-correct', 'feedback-incorrect');
+                state.currentTaskIndex++;
+                const progress = (state.currentTaskIndex / state.currentActivity.tasks.length) * 100;
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                
+                if (state.currentTaskIndex < state.currentActivity.tasks.length) {
+                    document.getElementById('question-counter').textContent = state.currentTaskIndex + 1;
+                    renderTask();
+                } else {
+                    finishActivity();
+                }
+            }, 1200);
+        }
+
+        async function finishActivity() {
+             if (auth.currentUser) {
+                try {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/atividades`), {
+                        studentName: state.studentName,
+                        activityId: state.currentActivity.id,
+                        activityTitle: state.currentActivity.title,
+                        results: state.sessionResults,
+                        timestamp: serverTimestamp()
+                    });
+                } catch(e) { console.error("Erro ao salvar a atividade:", e); }
+            }
+            renderEndScreen();
+            switchScreen('end');
+        }
+        
+        function renderEndScreen(){
+            const correctCount = state.sessionResults.filter(r => r.isCorrect).length;
+            screens.end.innerHTML = `
+                 <h1 class="text-4xl font-bold text-green-500 mb-4">Atividade Concluída!</h1>
+                 <p class="text-xl text-gray-600 mb-8">Você acertou ${correctCount} de ${state.currentActivity.tasks.length} questões. O relatório foi salvo.</p>
+                 <button id="back-to-hub-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg text-xl">Voltar para Atividades</button>
+                 <button id="end-logout-btn" class="mt-4 text-gray-500 hover:text-gray-800">Sair</button>
+            `;
+            document.getElementById('back-to-hub-btn').onclick = () => { renderStudentHub(); switchScreen('studentHub'); };
+            document.getElementById('end-logout-btn').onclick = logout;
+        }
+
+        function createVisual(type) {
+            const visuals = {
+                sun: '<svg class="w-12 h-12 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zM4.225 5.225a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zM2 10a1 1 0 011-1h1a1 1 0 110 2H3a1 1 0 01-1-1zm13.364-3.364a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707zM10 16a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zm3.775-4.775a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM16 10a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1zm-9.364 3.364a1 1 0 011.414 1.414l.707.707a1 1 0 01-1.414-1.414l-.707-.707a1 1 0 010-1.414zM10 14a4 4 0 100-8 4 4 0 000 8z" clip-rule="evenodd" /></svg>',
+                moon: '<svg class="w-12 h-12 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>',
+                star: '<svg class="w-12 h-12 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>',
+                apple: '<svg class="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004.006 18h11.988a1 1 0 00.999-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clip-rule="evenodd" /></svg>',
+                ball: '<svg class="w-12 h-12 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clip-rule="evenodd" /></svg>',
+                hundred: `<div class="w-24 h-24 bg-red-300 grid grid-cols-10 grid-rows-10 gap-px p-1 border-2 border-red-500">${ '<div class="bg-red-500"></div>'.repeat(100) }</div>`,
+                ten: `<div class="w-6 h-24 bg-blue-300 grid grid-rows-10 gap-px p-1 border-2 border-blue-500">${ '<div class="bg-blue-500"></div>'.repeat(10) }</div>`,
+                one: '<div class="w-6 h-6 bg-yellow-300 border-2 border-yellow-500"></div>'
+            };
+            return visuals[type] || '';
+        }
+
+        // --- FUNÇÕES DO PAINEL DO PROFESSOR ---
+        function loadDashboard() {
+            const listDiv = document.getElementById('student-list');
+            listDiv.innerHTML = '<p class="text-gray-500">Carregando...</p>';
+            
+            const q = query(collection(db, `artifacts/${appId}/public/data/atividades`), orderBy("timestamp", "desc"));
+            
+            onSnapshot(q, (snapshot) => {
+                if(snapshot.empty) {
+                     listDiv.innerHTML = '<p class="text-gray-500">Nenhuma atividade foi realizada ainda.</p>';
+                     return;
+                }
+                const students = {};
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (!students[data.studentName]) {
+                        students[data.studentName] = [];
+                    }
+                    students[data.studentName].push(data);
+                });
+
+                listDiv.innerHTML = '';
+                for(const studentName in students) {
+                    const reports = students[studentName];
+                    const latestReport = reports[0];
+                    const date = latestReport.timestamp ? latestReport.timestamp.toDate().toLocaleDateString('pt-BR') : 'Data indisponível';
+
+                    const btn = document.createElement('button');
+                    btn.className = 'w-full text-left bg-gray-100 hover:bg-blue-100 p-4 rounded-lg';
+                    btn.innerHTML = `<div class="flex justify-between items-center"><span class="font-bold text-lg">${studentName}</span><span class="text-gray-600">Total de atividades: ${reports.length}</span></div>`;
+                    btn.onclick = () => showStudentHubForTeacher(studentName, reports);
+                    listDiv.appendChild(btn);
+                }
+            });
+        }
+        
+        function showStudentHubForTeacher(studentName, reports) {
+            state.studentName = studentName; 
+            document.getElementById('hub-welcome-message').textContent = `Atividades de ${studentName}`;
+            const listEl = document.getElementById('activities-list');
+            listEl.innerHTML = '';
+
+            activities.forEach(activity => {
+                const report = reports.find(r => r.activityId === activity.id);
+                const isCompleted = !!report;
+                const completionDate = isCompleted && report.timestamp ? report.timestamp.toDate().toLocaleString('pt-BR') : '';
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-100 p-4 rounded-lg flex justify-between items-center';
+                card.innerHTML = `
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">${activity.title}</h3>
+                        <p class="text-sm text-gray-600">${activity.description}</p>
+                    </div>
+                    <div class="text-right">
+                        ${isCompleted ? 
+                            `<p class="font-semibold text-green-600">Concluído</p><p class="text-xs text-gray-500">${completionDate.split(',')[0]}</p>` : 
+                            '<p class="font-semibold text-gray-500">Não iniciado</p>'
+                        }
+                    </div>
+                `;
+                
+                if (isCompleted) {
+                    const reportButton = document.createElement('button');
+                    reportButton.textContent = 'Ver Relatório';
+                    reportButton.className = 'ml-4 px-4 py-2 rounded text-white font-semibold bg-green-600 hover:bg-green-500';
+                    reportButton.onclick = () => renderPrintableReport(report);
+                    card.appendChild(reportButton);
+                }
+                listEl.appendChild(card);
+            });
+            switchScreen('studentHub');
+        }
+
+        function renderPrintableReport(data) {
+            const reportContainer = document.getElementById('printable-report');
+            const correctCount = data.results.filter(r => r.isCorrect).length;
+            
+            const skillsInDifficulty = {};
+            data.results.forEach(res => {
+                if(!res.isCorrect) {
+                    const skill = skills[res.task.skillId];
+                    if(skill && !skillsInDifficulty[skill.saeb]) {
+                        skillsInDifficulty[skill.saeb] = skill;
+                    }
+                }
+            });
+
+            let reportHTML = `
+                <div class="p-8">
+                    <div class="text-center border-b pb-4 mb-6">
+                        <h1 class="text-3xl font-bold">Relatório de Desempenho</h1>
+                        <h2 class="text-xl text-gray-700">${data.activityTitle}</h2>
+                    </div>
+                    <div class="flex justify-between mb-6">
+                        <div>
+                            <p><span class="font-bold">Aluno(a):</span> ${data.studentName}</p>
+                            <p><span class="font-bold">Data:</span> ${data.timestamp ? data.timestamp.toDate().toLocaleString('pt-BR') : 'Data indisponível'}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold">Resultado Final</p>
+                            <p class="text-2xl font-bold">${correctCount} / ${data.results.length} Acertos</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="text-xl font-bold border-b pb-2 mb-3">Análise Pedagógica - Habilidades a Desenvolver</h3>
+                        ${Object.keys(skillsInDifficulty).length === 0 ? '<p class="text-gray-600">O aluno demonstrou bom domínio das habilidades básicas nesta atividade.</p>' : ''}
+                        <ul class="list-disc list-inside space-y-2">
+                            ${Object.values(skillsInDifficulty).map(skill => `
+                                <li>
+                                    <span class="font-semibold">${skill.saeb} / ${skill.bncc}:</span> ${skill.desc}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-bold border-b pb-2 mb-3">Desempenho por Questão</h3>
+                        <table class="w-full border-collapse">
+                           <thead>
+                             <tr class="bg-gray-100">
+                                <th class="border p-2 text-left">#</th>
+                                <th class="border p-2 text-left">Instrução</th>
+                                <th class="border p-2 text-left">Resposta do Aluno</th>
+                                <th class="border p-2 text-left">Resposta Correta</th>
+                                <th class="border p-2 text-center">Resultado</th>
+                             </tr>
+                           </thead>
+                           <tbody>
+                            ${data.results.map((res, index) => `
+                                <tr class="${res.isCorrect ? '' : 'bg-red-50'}">
+                                    <td class="border p-2 font-semibold">${index + 1}</td>
+                                    <td class="border p-2">${res.task.instruction}</td>
+                                    <td class="border p-2">${res.selectedAnswer}</td>
+                                    <td class="border p-2">${res.task.answer}</td>
+                                    <td class="border p-2 text-center text-xl">${res.isCorrect ? '✔️' : '❌'}</td>
+                                </tr>
+                            `).join('')}
+                           </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            reportContainer.innerHTML = reportHTML;
+            window.print();
+        }
+
+        // --- Event Listeners Iniciais ---
+        document.getElementById('login-btn').onclick = login;
+        document.getElementById('hub-logout-btn').onclick = logout;
+        document.getElementById('show-dashboard-btn').onclick = () => {
+            loadDashboard();
+            switchScreen('dashboard');
+        };
+        document.getElementById('back-to-start-btn').onclick = logout;
+    </script>
+</body>
+</html>
+
