@@ -99,15 +99,25 @@
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'portal-acompanhamento-v2';
         
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        let app, db, auth;
+
+        // CORREÇÃO: Inicializa o Firebase apenas se a configuração for válida
+        if (firebaseConfig && firebaseConfig.projectId) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } else {
+            console.warn("Configuração do Firebase não encontrada. A aplicação funcionará em modo offline.");
+        }
 
         async function signInFirebase() {
-            try {
-                if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
-                else await signInAnonymously(auth);
-            } catch (error) { console.error("Firebase auth error:", error); }
+            // CORREÇÃO: Tenta autenticar apenas se o auth foi inicializado
+            if (auth) {
+                try {
+                    if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                    else await signInAnonymously(auth);
+                } catch (error) { console.error("Firebase auth error:", error); }
+            }
         }
         signInFirebase();
         
@@ -193,16 +203,40 @@
             const listEl = document.getElementById('activities-list');
             listEl.innerHTML = '<p>Carregando histórico...</p>';
             
+            // CORREÇÃO: Verifica se o db existe antes de fazer a query
+            if (!db) {
+                listEl.innerHTML = '<p class="text-red-500">Erro de conexão. Relatórios indisponíveis.</p>';
+                // Mesmo sem DB, mostra as atividades como não iniciadas
+                activities.forEach(activity => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-100 p-4 rounded-lg flex justify-between items-center';
+                    card.innerHTML = `
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">${activity.title}</h3>
+                            <p class="text-sm text-gray-600">${activity.description}</p>
+                        </div>
+                        <div class="text-right">
+                           <p class="font-semibold text-gray-500">Não iniciado</p>
+                        </div>
+                    `;
+                    const startButton = document.createElement('button');
+                    startButton.textContent = 'Iniciar';
+                    startButton.className = `ml-4 px-4 py-2 rounded text-white font-semibold bg-blue-500 hover:bg-blue-400`;
+                    startButton.onclick = () => startActivity(activity.id);
+                    card.appendChild(startButton);
+                    listEl.appendChild(card);
+                });
+                return;
+            }
+
             const q = query(collection(db, `artifacts/${appId}/public/data/atividades`), where("studentName", "==", name));
             onSnapshot(q, (snapshot) => {
                 const completedActivities = {};
                 
-                // Filtra documentos que ainda não têm timestamp e depois ordena
                 const docs = snapshot.docs.map(doc => doc.data()).filter(data => data.timestamp);
                 docs.sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
 
                 docs.forEach(data => {
-                    // A verificação acima garante que data.timestamp existe
                     if (!completedActivities[data.activityId]) {
                         completedActivities[data.activityId] = data.timestamp.toDate();
                     }
@@ -328,7 +362,8 @@
         }
 
         async function finishActivity() {
-             if (auth.currentUser) {
+             // CORREÇÃO: Verifica se auth e db existem antes de salvar
+             if (auth && auth.currentUser && db) {
                 try {
                     await addDoc(collection(db, `artifacts/${appId}/public/data/atividades`), {
                         studentName: state.studentName,
@@ -374,6 +409,11 @@
             const listDiv = document.getElementById('student-list');
             listDiv.innerHTML = '<p class="text-gray-500">Carregando...</p>';
             
+            if (!db) {
+                listDiv.innerHTML = '<p class="text-red-500">Erro de conexão. Relatórios indisponíveis.</p>';
+                return;
+            }
+
             const q = query(collection(db, `artifacts/${appId}/public/data/atividades`), orderBy("timestamp", "desc"));
             
             onSnapshot(q, (snapshot) => {
