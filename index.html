@@ -392,22 +392,31 @@
         async function finishActivity() {
             if (SCRIPT_URL && SCRIPT_URL !== 'COLE_SUA_URL_AQUI') {
                 const payload = {
-                    action: 'save',
-                    data: {
-                        studentName: state.studentName,
-                        activityId: state.currentActivity.id,
-                        activityTitle: state.currentActivity.title,
-                        results: state.sessionResults,
-                        timestamp: new Date().toISOString(),
-                    }
+                    studentName: state.studentName,
+                    activityId: state.currentActivity.id,
+                    activityTitle: state.currentActivity.title,
+                    results: JSON.stringify(state.sessionResults), // Stringify results for the sheet
+                    timestamp: new Date().toISOString(),
                 };
+
+                const formData = new FormData();
+                formData.append('action', 'save');
+                formData.append('data', JSON.stringify(payload));
+
                 try {
-                    await fetch(SCRIPT_URL, {
+                    const response = await fetch(SCRIPT_URL, {
                         method: 'POST',
-                        body: JSON.stringify(payload),
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: formData,
                     });
-                } catch(e) { console.error("Erro ao salvar a atividade:", e); }
+
+                    if (!response.ok) {
+                        console.error('Falha ao salvar. Status:', response.status, await response.text());
+                    } else {
+                        console.log('Tentativa de salvar enviada com sucesso.');
+                    }
+                } catch (e) {
+                    console.error("Erro de rede ao salvar a atividade:", e);
+                }
             }
             renderEndScreen();
             switchScreen('end');
@@ -670,3 +679,4 @@
     </script>
 </body>
 </html>
+
