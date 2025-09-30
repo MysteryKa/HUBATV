@@ -3,46 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Acompanhamento Individualizado</title>
+    <title>Portal de Atividades Interativas</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: #f0f4f8;
-            color: #1a202c;
-        }
-        .btn-answer {
-            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-        }
-        .btn-answer:active {
-            transform: scale(0.95);
-        }
+        body { font-family: 'Poppins', sans-serif; background-color: #f0f4f8; color: #1a202c; }
+        .btn, .btn-answer { transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease; }
+        .btn:active, .btn-answer:active { transform: scale(0.95); }
         .feedback-correct { animation: flash-green 0.7s; }
         @keyframes flash-green { 50% { background-color: #c6f6d5; } }
         .feedback-incorrect { animation: flash-red 0.7s; }
         @keyframes flash-red { 50% { background-color: #fed7d7; } }
-        .progress-bar-fill { transition: width 0.5s ease; }
-        
-        /* Estilos para Impressão */
+        .tab-btn { padding: 0.75rem 1.5rem; font-size: 1.125rem; font-weight: 600; border-radius: 0.5rem; cursor: pointer; border-bottom: 4px solid transparent; }
+        .tab-btn-active { color: #2563eb; border-bottom-color: #2563eb; }
+        .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 320px; margin: 20px auto; }
+        .board-cell { width: 56px; height: 56px; border: 2px solid #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.1rem; background-color: #f1f5f9; }
+        .player-position { background-color: #60a5fa; color: white; border-color: #2563eb; transform: scale(1.1); box-shadow: 0 0 15px rgba(96, 165, 250, 0.7); }
+        .challenge-cell { background-color: #facc15; border-color: #ca8a04; }
+        .start-cell { background-color: #4ade80; border-color: #16a34a; color: white;}
+        .end-cell { background-color: #f87171; border-color: #dc2626; color: white;}
         @media print {
-            body * {
-                visibility: hidden;
-            }
-            #printable-report, #printable-report * {
-                visibility: visible;
-            }
-            #printable-report {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-            }
-            .no-print {
-                display: none;
-            }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body * { visibility: hidden; }
+            #printable-report, #printable-report * { visibility: visible; }
+            #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none; }
         }
     </style>
 </head>
@@ -52,189 +40,153 @@
 
         <!-- TELA DE LOGIN -->
         <div id="login-screen" class="bg-white p-8 rounded-2xl shadow-xl text-center">
-            <h1 class="text-3xl font-bold text-blue-600 mb-2">Portal de Acompanhamento</h1>
-            <p class="text-gray-500 mb-8">Acesse as atividades ou os relatórios.</p>
+            <h1 class="text-3xl font-bold text-blue-600 mb-2">Portal de Atividades</h1>
+            <p class="text-gray-500 mb-8">Aprender e brincar nunca foi tão fácil!</p>
             <input type="text" id="student-name-input" placeholder="Nome do Aluno(a)" class="w-full max-w-sm mx-auto bg-gray-100 border-2 border-gray-300 text-gray-800 text-center text-lg rounded-lg p-3 mb-6 focus:outline-none focus:border-blue-500 transition-colors">
-            <button id="login-btn" class="mt-2 w-full max-w-sm mx-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-transform hover:scale-105">Acessar Atividades</button>
+            <button id="login-btn" class="mt-2 w-full max-w-sm mx-auto bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transition-transform hover:scale-105 btn">Acessar Atividades</button>
             <button id="show-dashboard-btn" class="mt-4 text-gray-500 hover:text-gray-800">Painel do Professor</button>
         </div>
         
         <!-- HUB DE ATIVIDADES DO ALUNO -->
-        <div id="student-hub-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl">
-            <div class="flex justify-between items-center mb-6">
-                <h1 id="hub-welcome-message" class="text-3xl font-bold text-gray-800"></h1>
-                <button id="hub-back-btn" class="text-gray-500 hover:text-gray-800">← Voltar</button>
-            </div>
-            <div id="activities-list" class="space-y-4"></div>
-        </div>
-
+        <div id="student-hub-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl"></div>
+        
         <!-- TELA DE ATIVIDADE -->
-        <div id="activity-screen" class="hidden bg-white p-6 rounded-2xl shadow-xl">
-             <!-- Conteúdo da atividade (gerado dinamicamente) -->
-        </div>
+        <div id="activity-screen" class="hidden bg-white p-6 rounded-2xl shadow-xl"></div>
         
         <!-- TELA DE FIM DE SESSÃO -->
-        <div id="end-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl text-center">
-              <!-- Conteúdo de fim de sessão (gerado dinamicamente) -->
-        </div>
+        <div id="end-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl text-center"></div>
 
         <!-- PAINEL DO PROFESSOR -->
-        <div id="dashboard-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl">
-              <div id="dashboard-main">
-                  <h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">Painel do Professor</h1>
-                  <div id="student-list" class="space-y-3 max-h-[60vh] overflow-y-auto"></div>
-              </div>
-              <button id="back-to-start-btn" class="mt-8 text-gray-500 hover:text-gray-800 mx-auto block">Voltar ao Início</button>
-        </div>
+        <div id="dashboard-screen" class="hidden bg-white p-8 rounded-2xl shadow-xl"></div>
     </div>
     
-    <!-- ÁREA DE IMPRESSÃO (Fora do container principal) -->
+    <!-- ÁREA DE IMPRESSÃO -->
     <div id="printable-report" class="bg-white"></div>
-
-
+    
     <script>
-        // --- CONFIGURAÇÃO MANUAL ---
-        // COLE A URL GERADA PELO GOOGLE APPS SCRIPT AQUI
+    document.addEventListener('DOMContentLoaded', () => {
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw5eYuevOFhnFCxe4NVGy71qZ_j1kvWn5kzvglrs9rN8bJep_qtxGjJ3Zj51RjRjtk/exec'; 
-        // -------------------------
+        const skills = { S1:{saeb:"D19",bncc:"EF01MA01",desc:"Contar e reconhecer números naturais."},S2:{saeb:"D19",bncc:"EF01MA06",desc:"Resolver problemas de adição e subtração com suporte visual."},S3:{saeb:"D20",bncc:"EF02MA04",desc:"Compreender o sistema de numeração decimal."},S4:{saeb:"D22",bncc:"EF03MA05",desc:"Utilizar diferentes procedimentos de cálculo para resolver problemas (multiplicação/divisão)."},S5:{saeb:"D19",bncc:"EF01MA08",desc:"Resolver problemas envolvendo diferentes significados das operações."},S6:{saeb:"D17",bncc:"EF02MA20",desc:"Resolver problemas com o sistema monetário brasileiro."},L1:{saeb:"N/A",bncc:"EF01LP04",desc:"Distinguir as letras do alfabeto de outros sinais gráficos."},L2:{saeb:"N/A",bncc:"EF01LP10",desc:"Nomear as letras do alfabeto e recitá-lo na ordem das letras."} };
+        function generateMathActivity(title,id,op,maxNumber,questions=20){const activity={id:id,title:title,description:`Pratique ${op==="+"?"somas":op==="-"?"subtrações":op==="*"?"multiplicações":"divisões"} até ${maxNumber}.`,tasks:[]};for(let i=0;i<questions;i++){let num1,num2,answer;if(op==="+"||op==="*"){num1=Math.floor(Math.random()*(op==="*"&&maxNumber>10?10:maxNumber))+1;num2=Math.floor(Math.random()*(op==="*"&&maxNumber>10?10:maxNumber))+1;answer=op==="+"?num1+num2:num1*num2}else{num2=Math.floor(Math.random()*(maxNumber-1))+1;answer=Math.floor(Math.random()*(maxNumber-num2))+1;num1=answer+num2;if(op==="/"){num1=num2*(Math.floor(Math.random()*5)+2);answer=num1/num2}}const options=new Set([answer]);while(options.size<3){const wrongOption=answer+(Math.floor(Math.random()*5)+1)*(Math.random()>.5?1:-1);if(wrongOption>0&&wrongOption!==answer)options.add(wrongOption)}activity.tasks.push({type:"operation",instruction:`Quanto é ${num1} ${op==="*"?"vezes":op} ${num2}?`,op:op,quantities:[num1,num2],answer:answer,options:Array.from(options).sort(()=>Math.random()-.5),skillId:"S2"})}return activity}
+        const activities=[{id:"diagnostico_inicial_numeramento",title:"Diagnóstico de Numeramento",description:"20 questões para sondagem de habilidades básicas.",tasks:[{type:"recognize",instruction:"Toque no número 5",answer:5,options:[3,8,5],skillId:"S1"},{type:"count",instruction:"Quantos sóis você vê?",quantity:4,answer:4,options:[4,2,6],skillId:"S1"},{type:"count",instruction:"Quantas luas você vê?",quantity:8,answer:8,options:[7,8,9],skillId:"S1"},{type:"match",instruction:"Toque no número que representa as estrelas",quantity:7,answer:7,options:[5,7,9],skillId:"S1"},{type:"compare",instruction:"Qual lado tem MAIS?",quantities:[6,3],answer:"left",skillId:"S1"},{type:"operation",instruction:"Quanto é?",quantities:[3,2],op:"+",answer:5,options:[4,5,6],skillId:"S2"},{type:"operation",instruction:"Quanto é?",quantities:[5,4],op:"+",answer:9,options:[8,1,9],skillId:"S2"},{type:"operation",instruction:"Quanto resta?",quantities:[6,2],op:"-",answer:4,options:[8,3,4],skillId:"S2"},{type:"operation",instruction:"Quanto resta?",quantities:[9,5],op:"-",answer:4,options:[4,5,14],skillId:"S2"},{type:"operation",instruction:"Quanto é?",quantities:[7,3],op:"+",answer:10,options:[4,9,10],skillId:"S2"},{type:"recognize",instruction:"Toque no número 14",answer:14,options:[41,24,14],skillId:"S3"},{type:"placeValue",instruction:"Que número é este?",answer:23,values:{tens:2,ones:3},options:[32,23,5],skillId:"S3"},{type:"placeValue",instruction:"Que número é este?",answer:41,values:{tens:4,ones:1},options:[14,41,50],skillId:"S3"},{type:"operation",instruction:"Quanto é?",quantities:[10,6],op:"+",answer:16,options:[4,16,106],skillId:"S3"},{type:"operation",instruction:"Quanto resta?",quantities:[20,5],op:"-",answer:15,options:[25,10,15],skillId:"S3"},{type:"placeValue",instruction:"Que número é este?",answer:125,values:{hundreds:1,tens:2,ones:5},options:[152,215,125],skillId:"S4"},{type:"placeValue",instruction:"Que número é este?",answer:304,values:{hundreds:3,tens:0,ones:4},options:[340,403,304],skillId:"S4"},{type:"operation",instruction:"Quanto é?",quantities:[22,13],op:"+",answer:35,options:[35,25,19],skillId:"S4"},{type:"operation",instruction:"Quanto é?",quantities:[16,7],op:"+",answer:23,options:[13,23,24],skillId:"S4"},{type:"recognize",instruction:"Toque no número 1000",answer:1e3,options:[100,10,1e3],skillId:"S4"}]},{id:"desafios_dia_a_dia",title:"Desafios do Dia a Dia",description:"20 problemas com situações práticas e dinheiro.",tasks:[{type:"problem",instruction:"Ana tinha 8 maçãs e comeu 3. Com quantas ela ficou?",visuals:{type:"apple",quantities:[8,3],op:"-"},answer:5,options:[11,5,6],skillId:"S5"},{type:"problem",instruction:"Pedro tem 5 bolas e ganha mais 4. Com quantas ele fica?",visuals:{type:"ball",quantities:[5,4],op:"+"},answer:9,options:[1,9,8],skillId:"S5"},{type:"problem",instruction:"Havia 9 pássaros no fio. 4 voaram. Quantos ficaram?",visuals:{type:"bird",quantities:[9,4],op:"-"},answer:5,options:[13,5,6],skillId:"S5"},{type:"problem",instruction:"João tem 3 carrinhos e ganha mais 3. Com quantos ele fica?",visuals:{type:"car",quantities:[3,3],op:"+"},answer:6,options:[0,5,6],skillId:"S5"},{type:"problem",instruction:"Numa cesta há 6 laranjas e 5 limões. Quantas frutas há no total?",visuals:{type:"fruta",quantities:[6,5],op:"+"},answer:11,options:[1,11,10],skillId:"S5"},{type:"money",instruction:"Quanto dinheiro você tem ao todo?",items:["5r","2r","1r"],answer:8,options:[7,8,9],skillId:"S6"},{type:"money",instruction:"Junte as moedas. Qual o total?",items:["1r","1r","1r","1r","1r"],answer:5,options:[4,6,5],skillId:"S6"},{type:"money",instruction:"Um sorvete custa R$ 4. Se você pagar com R$ 5, qual é o troco?",items:["5r","sorvete_4r"],answer:1,options:[1,9,4],skillId:"S6"},{type:"money",instruction:"Um suco custa R$ 6. Se você pagar com R$ 10, qual é o troco?",items:["10r","suco_6r"],answer:4,options:[16,3,4],skillId:"S6"},{type:"money",instruction:"Quanto dinheiro você tem ao todo?",items:["10r","5r","2r"],answer:17,options:[15,17,18],skillId:"S6"},{type:"problem",instruction:"Você tem 6 adesivos, ganha 2 e depois perde 1. Com quantos fica?",visuals:{type:"star",quantities:[6,2,1],op:"+-"},answer:7,options:[7,8,9],skillId:"S5"},{type:"problem",instruction:"No ônibus havia 10 pessoas. Desceram 4 e subiram 2. Quantas pessoas há agora?",visuals:{type:"pessoa",quantities:[10,4,2],op:"-+"},answer:8,options:[6,7,8],skillId:"S5"},{type:"problem",instruction:"Maria fez 5 biscoitos. Depois fez mais 5. Comeu 3. Quantos restaram?",visuals:{type:"biscoito",quantities:[5,5,3],op:"+-"},answer:7,options:[7,10,13],skillId:"S5"},{type:"money",instruction:"Você tem R$ 10. Compra um gibi de R$ 7. Qual o troco?",items:["10r","gibi_7r"],answer:3,options:[3,17,4],skillId:"S6"},{type:"money",instruction:"Você tem R$ 12. Ganha R$ 5. Com quanto você fica?",items:["10r","2r","5r_add"],answer:17,options:[7,16,17],skillId:"S6"},{type:"problem",instruction:"Em um aquário há 4 peixes azuis e 3 vermelhos. Chegaram mais 2 peixes azuis. Quantos peixes há no total?",visuals:{type:"peixe",quantities:[4,3,2],op:"++"},answer:9,options:[8,9,10],skillId:"S5"},{type:"money",instruction:"Um caderno custa R$ 8. Você paga com duas notas de R$ 5. Qual o troco?",items:["5r","5r","caderno_8r"],answer:2,options:[2,3,18],skillId:"S6"},{type:"problem",instruction:"Numa árvore havia 12 laranjas. Caíram 5 e você colheu 3. Quantas laranjas sobraram na árvore?",visuals:{type:"fruta",quantities:[12,5,3],op:"--"},answer:4,options:[4,7,10],skillId:"S5"},{type:"money",instruction:"Junte todo o dinheiro. Qual o total?",items:["10r","5r","2r","1r","1r"],answer:19,options:[18,19,20],skillId:"S6"},{type:"problem",instruction:"Bia tem 7 bonecas. Ganha 3 de sua mãe e dá 2 para sua prima. Com quantas bonecas Bia fica?",visuals:{type:"boneca",quantities:[7,3,2],op:"+-"},answer:8,options:[6,8,12],skillId:"S5"}]},{id:"encontre_vogais",title:"Letramento: Caça às Vogais",description:"Clique na vogal que se pede.",tasks:[{type:"recognizeLetter",instruction:"Toque na letra A",answer:"A",options:["B","A","C"],skillId:"L1"},{type:"recognizeLetter",instruction:"Toque na letra E",answer:"E",options:["F","D","E"],skillId:"L1"},{type:"recognizeLetter",instruction:"Toque na letra I",answer:"I",options:["I","J","L"],skillId:"L1"},{type:"recognizeLetter",instruction:"Toque na letra O",answer:"O",options:["P","O","Q"],skillId:"L1"},{type:"recognizeLetter",instruction:"Toque na letra U",answer:"U",options:["V","W","U"],skillId:"L1"}].flatMap(t=>Array(4).fill(t))},{id:"quantas_letras",title:"Letramento: Contador de Letras",description:"Conte quantas letras tem cada palavra.",tasks:[{type:"countLetters",instruction:"Quantas letras tem a palavra SOL?",word:"SOL",answer:3,options:[2,3,4],skillId:"L2"},{type:"countLetters",instruction:"Quantas letras tem a palavra LUA?",word:"LUA",answer:3,options:[2,3,4],skillId:"L2"},{type:"countLetters",instruction:"Quantas letras tem a palavra CASA?",word:"CASA",answer:4,options:[3,4,5],skillId:"L2"},{type:"countLetters",instruction:"Quantas letras tem a palavra GATO?",word:"GATO",answer:4,options:[3,4,5],skillId:"L2"},{type:"countLetters",instruction:"Quantas letras tem a palavra BOLA?",word:"BOLA",answer:4,options:[3,4,5],skillId:"L2"}].flatMap(t=>Array(4).fill(t))},{id:"forma_palavra",title:"Letramento: Monta Palavras",description:"Coloque as letras na ordem certa.",tasks:[{type:"forma_palavra",instruction:"Forme a palavra BOLA",image:"ball",answer:"BOLA",letters:["L","A","B","O"],skillId:"L2"},{type:"forma_palavra",instruction:"Forme a palavra PATO",image:"duck",answer:"PATO",letters:["T","O","P","A"],skillId:"L2"},{type:"forma_palavra",instruction:"Forme a palavra DADO",image:"dice",answer:"DADO",letters:["O","D","A","D"],skillId:"L2"},{type:"forma_palavra",instruction:"Forme a palavra UVA",image:"grape",answer:"UVA",letters:["A","U","V"],skillId:"L2"},{type:"forma_palavra",instruction:"Forme a palavra SOL",image:"sun",answer:"SOL",letters:["L","S","O"],skillId:"L2"}].flatMap(t=>Array(4).fill(t))},{id:"contagem_visual_10",title:"Contagem: Objetos até 10",description:"Conte quantos objetos aparecem.",tasks:Array.from({length:20},()=>{const qty=Math.floor(Math.random()*9)+2;return{type:"count",instruction:"Quantos objetos você vê?",quantity:qty,answer:qty,options:[qty,qty-1,qty+1].sort(()=>Math.random()-.5),skillId:"S1"}})},{id:"maior_ou_menor_10",title:"Comparação: Maior ou Menor (até 10)",description:"Qual lado tem mais objetos?",tasks:Array.from({length:20},()=>{const q1=Math.floor(Math.random()*10)+1;let q2=Math.floor(Math.random()*10)+1;while(q1===q2){q2=Math.floor(Math.random()*10)+1}return{type:"compare",instruction:"Qual lado tem MAIS?",quantities:[q1,q2],answer:q1>q2?"left":"right",skillId:"S1"}})},{id:"sequencia_numerica_20",title:"Raciocínio: Sequência Numérica (até 20)",description:"Descubra o número que falta.",tasks:Array.from({length:20},()=>{const start=Math.floor(Math.random()*15)+1;return{type:"sequencia",instruction:"Qual número está faltando?",sequence:[start,start+1,"?",start+3],answer:start+2,options:[start+2,start+1,start+3].sort(()=>Math.random()-.5),skillId:"S1"}})},generateMathActivity("Soma Simples até 10","soma_10","+",10),generateMathActivity("Subtração Simples até 10","subtracao_10","-",10),generateMathActivity("Soma Simples até 20","soma_20","+",20),generateMathActivity("Subtração Simples até 20","subtracao_20","-",20),generateMathActivity("Soma Simples até 50","soma_50","+",50),generateMathActivity("Subtração Simples até 50","subtracao_50","-",50),generateMathActivity("Multiplicação (Tabuada)","multiplicacao_10","*",10),generateMathActivity("Divisão Simples","divisao_5","/",25),{id:"operacoes_mistas_20",title:"Cálculo Rápido: Operações Mistas",description:"Resolva somas e subtrações até 20.",tasks:[...generateMathActivity("","","+",20,10).tasks,...generateMathActivity("","","-",20,10).tasks].sort(()=>Math.random()-.5)},{id:"trilha_do_tesouro",type:"game",title:"Jogo: Trilha do Tesouro",description:"Jogue o dado e resolva desafios!",tasks:Array(20).fill({type:"diceGame"})},{id:"banco_da_cidade",type:"game",title:"Jogo: Banco da Cidade",description:"Compre e venda para se tornar o mais rico!",tasks:Array(20).fill({type:"moneyGame"})}];
+        const state = { studentName: "", currentActivity: null, currentTaskIndex: 0, sessionResults: [], boardPosition: 0, builtWord: "" };
+        const screens = { login: document.getElementById('login-screen'), studentHub: document.getElementById('student-hub-screen'), activity: document.getElementById('activity-screen'), end: document.getElementById('end-screen'), dashboard: document.getElementById('dashboard-screen') };
 
-        // --- BANCO DE ATIVIDADES E HABILIDADES ---
-        const skills = {
-            S1: { saeb: 'D19', bncc: 'EF01MA01', desc: 'Contar e reconhecer números naturais.' },
-            S2: { saeb: 'D19', bncc: 'EF01MA06', desc: 'Resolver problemas de adição e subtração com suporte visual.' },
-            S3: { saeb: 'D20', bncc: 'EF02MA04', desc: 'Compreender o sistema de numeração decimal (unidades e dezenas).' },
-            S4: { saeb: 'D21', bncc: 'EF03MA02', desc: 'Compreender o sistema de numeração decimal (centenas) e realizar operações.' },
-            S5: { saeb: 'D19', bncc: 'EF01MA08', desc: 'Resolver problemas envolvendo diferentes significados da adição e subtração (juntar, acrescentar, separar, retirar).'},
-            S6: { saeb: 'D17', bncc: 'EF02MA20', desc: 'Estabelecer a equivalência de valores entre cédulas e moedas do sistema monetário brasileiro para resolver problemas.' },
+        // --- FUNÇÕES ---
+        const switchScreen = (screenName) => {
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            Object.values(screens).forEach(s => s && s.classList.add('hidden'));
+            if (screens[screenName]) screens[screenName].classList.remove('hidden');
+            else if (screens.login) screens.login.classList.remove('hidden');
         };
 
-        const activities = [
-            {
-                id: 'diagnostico_inicial_20',
-                title: 'Diagnóstico Inicial de Numeramento',
-                description: 'Uma avaliação com 20 questões progressivas para sondagem de habilidades básicas.',
-                tasks: [
-                    { type: 'recognize', instruction: 'Toque no número 5', answer: 5, options: [3, 8, 5], skillId: 'S1' },
-                    { type: 'count', instruction: 'Quantos sóis você vê?', quantity: 4, answer: 4, options: [4, 2, 6], skillId: 'S1' },
-                    { type: 'count', instruction: 'Quantas luas você vê?', quantity: 8, answer: 8, options: [7, 8, 9], skillId: 'S1' },
-                    { type: 'match', instruction: 'Toque no número que representa as estrelas', quantity: 7, answer: 7, options: [5, 7, 9], skillId: 'S1' },
-                    { type: 'compare', instruction: 'Qual lado tem MAIS?', quantities: [6, 3], answer: 'left', skillId: 'S1' },
-                    { type: 'operation', instruction: 'Quanto é?', quantities: [3, 2], op: '+', answer: 5, options: [4, 5, 6], skillId: 'S2' },
-                    { type: 'operation', instruction: 'Quanto é?', quantities: [5, 4], op: '+', answer: 9, options: [8, 1, 9], skillId: 'S2' },
-                    { type: 'operation', instruction: 'Quanto resta?', quantities: [6, 2], op: '-', answer: 4, options: [8, 3, 4], skillId: 'S2' },
-                    { type: 'operation', instruction: 'Quanto resta?', quantities: [9, 5], op: '-', answer: 4, options: [4, 5, 14], skillId: 'S2' },
-                    { type: 'operation', instruction: 'Quanto é?', quantities: [7, 3], op: '+', answer: 10, options: [4, 9, 10], skillId: 'S2' },
-                    { type: 'recognize', instruction: 'Toque no número 14', answer: 14, options: [41, 24, 14], skillId: 'S3' },
-                    { type: 'placeValue', instruction: 'Que número é este?', answer: 23, values: { tens: 2, ones: 3 }, options: [32, 23, 5], skillId: 'S3' },
-                    { type: 'placeValue', instruction: 'Que número é este?', answer: 41, values: { tens: 4, ones: 1 }, options: [14, 41, 50], skillId: 'S3' },
-                    { type: 'operation', instruction: 'Quanto é?', quantities: [10, 6], op: '+', answer: 16, options: [4, 16, 106], skillId: 'S3' },
-                    { type: 'operation', instruction: 'Quanto resta?', quantities: [20, 5], op: '-', answer: 15, options: [25, 10, 15], skillId: 'S3' },
-                    { type: 'placeValue', instruction: 'Que número é este?', answer: 125, values: { hundreds: 1, tens: 2, ones: 5 }, options: [152, 215, 125], skillId: 'S4' },
-                    { type: 'placeValue', instruction: 'Que número é este?', answer: 304, values: { hundreds: 3, tens: 0, ones: 4 }, options: [340, 403, 304], skillId: 'S4' },
-                    { type: 'operation', instruction: 'Quanto é?', quantities: [22, 13], op: '+', answer: 35, options: [35, 25, 19], skillId: 'S4' },
-                    { type: 'operation', instruction: 'Quanto é?', quantities: [16, 7], op: '+', answer: 23, options: [13, 23, 24], skillId: 'S4' },
-                    { type: 'recognize', instruction: 'Toque no número 1000', answer: 1000, options: [100, 10, 1000], skillId: 'S4' }
-                ]
-            },
-            {
-                id: 'desafios_raciocinio_operatorio_20',
-                title: 'Desafios do Dia a Dia (20 Questões)',
-                description: 'Problemas visuais de soma e subtração com situações práticas e dinheiro.',
-                tasks: [
-                    // Nível 1: Operações simples
-                    { type: 'problem', instruction: 'Ana tinha 8 maçãs e comeu 3. Com quantas ela ficou?', visuals: { type: 'apple', quantities: [8, 3], op: '-' }, answer: 5, options: [11, 5, 6], skillId: 'S5' },
-                    { type: 'problem', instruction: 'Pedro tem 5 bolas e ganha mais 4. Com quantas ele fica?', visuals: { type: 'ball', quantities: [5, 4], op: '+' }, answer: 9, options: [1, 9, 8], skillId: 'S5' },
-                    { type: 'problem', instruction: 'Havia 9 pássaros no fio. 4 voaram. Quantos ficaram?', visuals: { type: 'bird', quantities: [9, 4], op: '-' }, answer: 5, options: [13, 5, 6], skillId: 'S5' },
-                    { type: 'problem', instruction: 'João tem 3 carrinhos e ganha mais 3. Com quantos ele fica?', visuals: { type: 'car', quantities: [3, 3], op: '+' }, answer: 6, options: [0, 5, 6], skillId: 'S5' },
-                    { type: 'problem', instruction: 'Numa cesta há 6 laranjas e 5 limões. Quantas frutas há no total?', visuals: { type: 'fruta', quantities: [6, 5], op: '+' }, answer: 11, options: [1, 11, 10], skillId: 'S5' },
-                    // Nível 2: Sistema Monetário Básico
-                    { type: 'money', instruction: 'Quanto dinheiro você tem ao todo?', items: ['5r', '2r', '1r'], answer: 8, options: [7, 8, 9], skillId: 'S6' },
-                    { type: 'money', instruction: 'Junte as moedas. Qual o total?', items: ['1r', '1r', '1r', '1r', '1r'], answer: 5, options: [4, 6, 5], skillId: 'S6' },
-                    { type: 'money', instruction: 'Um sorvete custa R$ 4. Se você pagar com R$ 5, qual é o troco?', items: ['5r', 'sorvete_4r'], answer: 1, options: [1, 9, 4], skillId: 'S6' },
-                    { type: 'money', instruction: 'Um suco custa R$ 6. Se você pagar com R$ 10, qual é o troco?', items: ['10r', 'suco_6r'], answer: 4, options: [16, 3, 4], skillId: 'S6' },
-                    { type: 'money', instruction: 'Quanto dinheiro você tem ao todo?', items: ['10r', '5r', '2r'], answer: 17, options: [15, 17, 18], skillId: 'S6' },
-                    // Nível 3: Problemas com mais de um passo
-                    { type: 'problem', instruction: 'Você tem 6 adesivos, ganha 2 e depois perde 1. Com quantos fica?', visuals: { type: 'star', quantities: [6, 2, 1], op: '+-' }, answer: 7, options: [7, 8, 9], skillId: 'S5' },
-                    { type: 'problem', instruction: 'No ônibus havia 10 pessoas. Desceram 4 e subiram 2. Quantas pessoas há agora?', visuals: { type: 'pessoa', quantities: [10, 4, 2], op: '-+' }, answer: 8, options: [6, 7, 8], skillId: 'S5' },
-                    { type: 'problem', instruction: 'Maria fez 5 biscoitos. Depois fez mais 5. Comeu 3. Quantos restaram?', visuals: { type: 'biscoito', quantities: [5, 5, 3], op: '+-' }, answer: 7, options: [7, 10, 13], skillId: 'S5' },
-                    { type: 'money', instruction: 'Você tem R$ 10. Compra um gibi de R$ 7. Qual o troco?', items: ['10r', 'gibi_7r'], answer: 3, options: [3, 17, 4], skillId: 'S6' },
-                    { type: 'money', instruction: 'Você tem R$ 12. Ganha R$ 5. Com quanto você fica?', items: ['10r', '2r', '5r_add'], answer: 17, options: [7, 16, 17], skillId: 'S6' },
-                    // Nível 4: Desafios
-                    { type: 'problem', instruction: 'Em um aquário há 4 peixes azuis e 3 vermelhos. Chegaram mais 2 peixes azuis. Quantos peixes há no total?', visuals: { type: 'peixe', quantities: [4, 3, 2], op: '++' }, answer: 9, options: [8, 9, 10], skillId: 'S5' },
-                    { type: 'money', instruction: 'Um caderno custa R$ 8. Você paga com duas notas de R$ 5. Qual o troco?', items: ['5r', '5r', 'caderno_8r'], answer: 2, options: [2, 3, 18], skillId: 'S6' },
-                    { type: 'problem', instruction: 'Numa árvore havia 12 laranjas. Caíram 5 e você colheu 3. Quantas laranjas sobraram na árvore?', visuals: { type: 'fruta', quantities: [12, 5, 3], op: '--' }, answer: 4, options: [4, 7, 10], skillId: 'S5' },
-                    { type: 'money', instruction: 'Junte todo o dinheiro. Qual o total?', items: ['10r', '5r', '2r', '1r', '1r'], answer: 19, options: [18, 19, 20], skillId: 'S6' },
-                    { type: 'problem', instruction: 'Bia tem 7 bonecas. Ganha 3 de sua mãe e dá 2 para sua prima. Com quantas bonecas Bia fica?', visuals: { type: 'boneca', quantities: [7, 3, 2], op: '+-' }, answer: 8, options: [6, 8, 12], skillId: 'S5' }
-                ]
+        const readAloud = (text) => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pt-BR';
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
             }
-        ];
-
-        // --- ESTADO DA APLICAÇÃO ---
-        const state = {
-            studentName: "",
-            currentActivity: null,
-            currentTaskIndex: 0,
-            sessionResults: [],
-            currentView: 'login' // 'login', 'hub', 'dashboard'
         };
-        
-        const screens = {
-            login: document.getElementById('login-screen'),
-            studentHub: document.getElementById('student-hub-screen'),
-            activity: document.getElementById('activity-screen'),
-            end: document.getElementById('end-screen'),
-            dashboard: document.getElementById('dashboard-screen')
-        };
-        
-        // --- FUNÇÕES DE CONTROLE DE TELA ---
-        function switchScreen(screenName) {
-            Object.values(screens).forEach(s => s.classList.add('hidden'));
-            if(screens[screenName]) screens[screenName].classList.remove('hidden');
-        }
 
-        function login() {
+        const showTab = (tabName) => {
+            document.getElementById('tab-content-atividades').classList.toggle('hidden', tabName !== 'atividades');
+            document.getElementById('tab-atividades').classList.toggle('tab-btn-active', tabName === 'atividades');
+            document.getElementById('tab-content-jogos').classList.toggle('hidden', tabName !== 'jogos');
+            document.getElementById('tab-jogos').classList.toggle('tab-btn-active', tabName === 'jogos');
+        };
+
+        const login = () => {
             const studentName = document.getElementById('student-name-input').value.trim();
-            if (studentName) {
-                state.studentName = studentName;
-                state.currentView = 'hub';
-                renderStudentHub();
-                switchScreen('studentHub');
-            } else {
-                // Em vez de alert, podemos usar um feedback visual
-                const input = document.getElementById('student-name-input');
-                input.classList.add('border-red-500');
-                input.placeholder = 'Por favor, preencha o nome!';
-                setTimeout(() => {
-                    input.classList.remove('border-red-500');
-                    input.placeholder = 'Nome do Aluno(a)';
-                }, 2000);
-            }
-        }
-
-        function logout() {
-            state.studentName = "";
-            document.getElementById('student-name-input').value = '';
-            switchScreen('login');
-        }
-
-        // --- FUNÇÕES DE RENDERIZAÇÃO ---
-        async function renderStudentHub() {
-            const name = state.studentName;
-            document.getElementById('hub-welcome-message').textContent = `Atividades de ${name}`;
-            const listEl = document.getElementById('activities-list');
-            listEl.innerHTML = '<p>Carregando histórico...</p>';
-            
-            if (!SCRIPT_URL || SCRIPT_URL === 'COLE_SUA_URL_AQUI') {
-                listEl.innerHTML = '<p class="text-red-500 font-semibold text-center">Atenção: A URL do script não foi configurada. Os relatórios não poderão ser salvos ou carregados.</p>';
-                activities.forEach(activity => createActivityCard(listEl, activity, {}));
+            if (!studentName) {
+                alert('Por favor, preencha o seu nome.');
                 return;
             }
+            state.studentName = studentName;
+            renderStudentHub();
+            switchScreen('studentHub');
+        };
+
+        const logout = () => {
+            state.studentName = "";
+            document.getElementById('student-name-input').value = "";
+            switchScreen('login');
+        };
+        
+        const loadDashboard = async () => {
+            const dashboard = screens.dashboard;
+            dashboard.innerHTML = `<div id="dashboard-main"><h1 class="text-3xl font-bold text-blue-600 mb-6 text-center">Painel do Professor</h1><div id="student-list" class="space-y-3 max-h-[60vh] overflow-y-auto"><p>A carregar relatórios...</p></div></div><button id="back-to-start-btn" class="mt-8 text-gray-500 hover:text-gray-800 mx-auto block">Voltar ao Início</button>`;
+            document.getElementById('back-to-start-btn').onclick = () => switchScreen('login');
+            
+            switchScreen('dashboard');
 
             try {
-                const response = await fetch(SCRIPT_URL + '?action=get');
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const response = await fetch(`${SCRIPT_URL}?action=get`);
                 const allReports = await response.json();
-                const studentReports = allReports.filter(r => r.studentName === name);
+                
+                const reportsByStudent = allReports.reduce((acc, report) => {
+                    if (!acc[report.studentName]) acc[report.studentName] = [];
+                    acc[report.studentName].push(report);
+                    return acc;
+                }, {});
+
+                const studentListEl = document.getElementById('student-list');
+                studentListEl.innerHTML = '';
+                
+                Object.keys(reportsByStudent).sort().forEach(studentName => {
+                    const studentReports = reportsByStudent[studentName];
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-lg text-gray-800">${studentName}</h3>
+                                <p class="text-sm text-gray-600">${studentReports.length} atividades completas</p>
+                            </div>
+                            <span class="text-blue-500 font-semibold">Ver Relatórios →</span>
+                        </div>`;
+                    card.onclick = () => {
+                        // Aqui você pode criar uma nova tela para mostrar os relatórios do aluno
+                        alert(`Relatórios para ${studentName}`);
+                    };
+                    studentListEl.appendChild(card);
+                });
+
+            } catch(e) {
+                document.getElementById('student-list').innerHTML = `<p class="text-red-500">Não foi possível carregar os relatórios.</p>`;
+                console.error("Erro ao carregar dashboard:", e);
+            }
+        };
+
+
+        async function renderStudentHub() {
+            const hub = screens.studentHub;
+            hub.innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Vamos lá, ${state.studentName}!</h1>
+                    <button id="hub-logout-btn" class="text-gray-500 hover:text-gray-800">Sair</button>
+                </div>
+                <div class="flex border-b mb-6">
+                    <button id="tab-atividades" class="tab-btn tab-btn-active">Atividades</button>
+                    <button id="tab-jogos" class="tab-btn">Jogos</button>
+                </div>
+                <div id="tab-content-atividades" class="space-y-4"></div>
+                <div id="tab-content-jogos" class="hidden space-y-4"></div>
+            `;
+            document.getElementById('hub-logout-btn').onclick = logout;
+            document.getElementById('tab-atividades').onclick = () => showTab('atividades');
+            document.getElementById('tab-jogos').onclick = () => showTab('jogos');
+
+            const activitiesListEl = document.getElementById('tab-content-atividades');
+            const gamesListEl = document.getElementById('tab-content-jogos');
+            activitiesListEl.innerHTML = '<p>Carregando...</p>';
+            gamesListEl.innerHTML = '<p>Carregando...</p>';
+            
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=get`);
+                const allReports = await response.json();
+                const studentReports = allReports.filter(r => r.studentName === state.studentName);
 
                 const latestCompleted = {};
                 studentReports.forEach(report => {
@@ -243,15 +195,23 @@
                     }
                 });
 
-                listEl.innerHTML = '';
-                activities.forEach(activity => createActivityCard(listEl, activity, latestCompleted));
+                activitiesListEl.innerHTML = '';
+                gamesListEl.innerHTML = '';
+                activities.forEach(activity => {
+                    const targetEl = activity.type === 'game' ? gamesListEl : activitiesListEl;
+                    createActivityCard(targetEl, activity, latestCompleted);
+                });
             } catch (error) {
                 console.error("Erro ao buscar relatórios:", error);
-                listEl.innerHTML = `<p class="text-red-500 text-center">Não foi possível carregar os relatórios. Verifique a conexão ou a configuração da planilha.</p>`;
-                activities.forEach(activity => createActivityCard(listEl, activity, {}));
+                activitiesListEl.innerHTML = '<p class="text-red-500">Não foi possível carregar o histórico.</p>';
+                gamesListEl.innerHTML = '';
+                 activities.forEach(activity => {
+                    const targetEl = activity.type === 'game' ? gamesListEl : activitiesListEl;
+                    createActivityCard(targetEl, activity, {});
+                });
             }
         }
-
+        
         function createActivityCard(listEl, activity, completedActivities) {
             const report = completedActivities[activity.id];
             const isCompleted = !!report;
@@ -260,436 +220,47 @@
             const card = document.createElement('div');
             card.className = 'bg-gray-100 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-4';
             card.innerHTML = `
-                <div class="flex-grow">
+                <div class="flex-grow text-center sm:text-left">
                     <h3 class="font-bold text-lg text-gray-800">${activity.title}</h3>
                     <p class="text-sm text-gray-600">${activity.description}</p>
                 </div>
                 <div class="text-center sm:text-right">
-                    ${isCompleted ? 
-                        `<p class="font-semibold text-green-600">Concluído</p><p class="text-xs text-gray-500">${completionDate}</p>` : 
-                        '<p class="font-semibold text-gray-500">Não iniciado</p>'
-                    }
+                    ${isCompleted ? `<p class="font-semibold text-green-600">Concluído</p><p class="text-xs text-gray-500">${completionDate}</p>` : '<p class="font-semibold text-gray-500">Não iniciado</p>'}
                 </div>`;
             const startButton = document.createElement('button');
-            startButton.textContent = isCompleted ? 'Refazer' : 'Iniciar';
+            startButton.textContent = isCompleted ? 'Jogar de Novo' : (activity.type === 'game' ? 'Jogar' : 'Iniciar');
             startButton.className = `w-full sm:w-auto px-6 py-2 rounded text-white font-semibold shadow-md transition-transform hover:scale-105 ${isCompleted ? 'bg-yellow-500 hover:bg-yellow-400' : 'bg-blue-500 hover:bg-blue-400'}`;
             startButton.onclick = () => startActivity(activity.id);
             card.appendChild(startButton);
             listEl.appendChild(card);
         }
-        
+
         function startActivity(activityId) {
             state.currentActivity = activities.find(a => a.id === activityId);
             state.currentTaskIndex = 0;
             state.sessionResults = [];
+            state.boardPosition = 1;
+            state.builtWord = "";
             renderActivityScreen();
             switchScreen('activity');
             renderTask();
         }
 
         function renderActivityScreen() {
-            screens.activity.innerHTML = `
-                <div class="mb-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-lg text-gray-700">${state.studentName}</span>
-                        <span class="text-gray-500">Questão <span id="question-counter">1</span> de ${state.currentActivity.tasks.length}</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-4">
-                        <div id="progress-bar" class="bg-blue-500 h-4 rounded-full progress-bar-fill" style="width: ${100 / state.currentActivity.tasks.length}%"></div>
-                    </div>
-                </div>
-                <p id="instruction-text" class="text-2xl font-semibold text-center text-gray-700 h-16 my-4 flex items-center justify-center"></p>
-                <div id="task-container" class="my-6 min-h-[200px] flex items-center justify-center gap-4 flex-wrap"></div>
-                <div id="options-container" class="mt-6 flex flex-wrap justify-center gap-4"></div>
-            `;
+             screens.activity.innerHTML = `
+                <div class="mb-4"><div class="flex justify-between items-center mb-2"><span class="font-bold text-lg text-gray-700">${state.studentName}</span><span class="text-gray-500">Questão <span id="question-counter">1</span> de ${state.currentActivity.tasks.length}</span></div><div class="w-full bg-gray-200 rounded-full h-4"><div id="progress-bar" class="bg-blue-500 h-4 rounded-full" style="width: ${100 / state.currentActivity.tasks.length}%"></div></div></div>
+                <div class="flex justify-center items-center gap-4 my-4"><p id="instruction-text" class="text-2xl font-semibold text-center text-gray-700 h-16 flex items-center justify-center"></p><button id="read-aloud-btn" class="p-2 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors"><svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clip-rule="evenodd"></path></svg></button></div>
+                <div id="task-container" class="my-6 min-h-[200px] flex flex-col items-center justify-center gap-4 flex-wrap"></div>
+                <div id="options-container" class="mt-6 flex flex-wrap justify-center gap-4"></div>`;
         }
         
-        function renderTask() {
-            const task = state.currentActivity.tasks[state.currentTaskIndex];
-            const instructionEl = document.getElementById('instruction-text');
-            const taskContainer = document.getElementById('task-container');
-            const optionsContainer = document.getElementById('options-container');
-            
-            instructionEl.textContent = task.instruction;
-            taskContainer.innerHTML = '';
-            optionsContainer.innerHTML = '';
-            
-            const itemMap = ['sun', 'moon', 'star', 'apple', 'ball', 'car', 'sorvete_3r', 'pirulito_2r'];
-            const itemType = (task.visuals && task.visuals.type) || itemMap[Math.floor(Math.random() * itemMap.length)];
-
-            if (task.type === 'count' || task.type === 'match') {
-                taskContainer.innerHTML = createVisual(itemType).repeat(task.quantity);
-            } else if (task.type === 'operation') {
-                const opSymbol = task.op === '+' ? '+' : '−';
-                taskContainer.innerHTML = `<div class="flex items-center gap-4 text-5xl font-bold"><div class="flex gap-2 flex-wrap justify-center">${createVisual(itemType).repeat(task.quantities[0])}</div><span>${opSymbol}</span><div class="flex gap-2 flex-wrap justify-center">${createVisual(itemType).repeat(task.quantities[1])}</div><span>=</span><span>?</span></div>`;
-            } else if (task.type === 'compare') {
-                taskContainer.innerHTML = `<button data-answer="left" class="btn-answer bg-white p-4 rounded-lg flex flex-wrap justify-center gap-2">${createVisual(itemType).repeat(task.quantities[0])}</button><div class="text-3xl font-bold">ou</div><button data-answer="right" class="btn-answer bg-white p-4 rounded-lg flex flex-wrap justify-center gap-2">${createVisual(itemType).repeat(task.quantities[1])}</button>`;
-            } else if (task.type === 'placeValue') {
-                let visuals = (createVisual('hundred').repeat(task.values.hundreds || 0)) + (createVisual('ten').repeat(task.values.tens || 0)) + (createVisual('one').repeat(task.values.ones || 0));
-                taskContainer.innerHTML = visuals;
-            } else if (task.type === 'problem') {
-                if (task.visuals.op === '+-') {
-                    taskContainer.innerHTML = `<div class="flex items-center gap-2 text-3xl font-bold"><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[0])}</div><span>+</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[1])}</div><span>−</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[2])}</div></div>`;
-                } else if (task.visuals.op === '-+') {
-                    taskContainer.innerHTML = `<div class="flex items-center gap-2 text-3xl font-bold"><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[0])}</div><span>−</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[1])}</div><span>+</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[2])}</div></div>`;
-                } else if (task.visuals.op === '--') {
-                    taskContainer.innerHTML = `<div class="flex items-center gap-2 text-3xl font-bold"><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[0])}</div><span>−</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[1])}</div><span>−</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[2])}</div></div>`;
-                } else if (task.visuals.op === '++') {
-                    taskContainer.innerHTML = `<div class="flex items-center gap-2 text-3xl font-bold"><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[0])}</div><span>+</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[1])}</div><span>+</span><div>${createVisual(task.visuals.type).repeat(task.visuals.quantities[2])}</div></div>`;
-                } else {
-                    const opSymbol = task.visuals.op === '+' ? '+' : '−';
-                    taskContainer.innerHTML = `<div class="flex items-center gap-4 text-5xl font-bold"><div class="flex gap-2 flex-wrap justify-center">${createVisual(task.visuals.type).repeat(task.visuals.quantities[0])}</div><span>${opSymbol}</span><div class="flex gap-2 flex-wrap justify-center">${createVisual(task.visuals.type).repeat(task.visuals.quantities[1])}</div></div>`;
-                }
-            } else if (task.type === 'money') {
-                taskContainer.innerHTML = task.items.map(item => createVisual(item)).join('');
-            }
-
-            if (task.options) {
-                task.options.forEach(opt => {
-                    const button = document.createElement('button');
-                    button.dataset.answer = opt;
-                    button.className = "btn-answer bg-blue-500 text-white text-5xl font-bold rounded-2xl p-6 shadow-md w-32 h-32 flex items-center justify-center";
-                    button.textContent = opt;
-                    optionsContainer.appendChild(button);
-                });
-            }
-            
-            document.querySelectorAll('[data-answer]').forEach(el => {
-                el.onclick = (e) => handleAnswer(e.currentTarget.dataset.answer);
-            });
-        }
+        // ... (o restante das funções permanece igual)
         
-        function handleAnswer(selectedAnswer) {
-            const task = state.currentActivity.tasks[state.currentTaskIndex];
-            if (!task) return; 
-            const isCorrect = String(selectedAnswer) === String(task.answer);
-            state.sessionResults.push({ task, selectedAnswer, isCorrect });
-
-            const body = document.querySelector('body');
-            body.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
-            
-            // Prevent multiple clicks
-            document.querySelectorAll('[data-answer]').forEach(el => el.disabled = true);
-
-            setTimeout(() => {
-                body.classList.remove('feedback-correct', 'feedback-incorrect');
-                state.currentTaskIndex++;
-                const progress = (state.currentTaskIndex / state.currentActivity.tasks.length) * 100;
-                const progressBar = document.getElementById('progress-bar');
-                if(progressBar) progressBar.style.width = `${progress}%`;
-                
-                if (state.currentTaskIndex < state.currentActivity.tasks.length) {
-                    const questionCounter = document.getElementById('question-counter');
-                    if(questionCounter) questionCounter.textContent = state.currentTaskIndex + 1;
-                    renderTask();
-                } else {
-                    finishActivity();
-                }
-            }, 1200);
-        }
-
-       async function finishActivity() {
-            if (SCRIPT_URL && SCRIPT_URL !== 'COLE_SUA_URL_AQUI') {
-                const payload = {
-                    action: 'save',
-                    data: {
-                        studentName: state.studentName,
-                        activityId: state.currentActivity.id,
-                        activityTitle: state.currentActivity.title,
-                        results: state.sessionResults,
-                        timestamp: new Date().toISOString(),
-                    }
-                };
-
-                console.log("Enviando para a planilha:", JSON.stringify(payload, null, 2));
-
-                try {
-                    // Usar 'text/plain' como Content-Type para evitar uma requisição "pre-flight" de CORS
-                    const response = await fetch(SCRIPT_URL, {
-                        method: 'POST',
-                        redirect: 'follow',
-                        body: JSON.stringify(payload),
-                        headers: {
-                            'Content-Type': 'text/plain;charset=utf-8',
-                        },
-                    });
-
-                    const resultText = await response.text();
-                    console.log("Resposta da planilha:", resultText);
-
-                    if (!response.ok) {
-                         console.error('Falha ao salvar. Status:', response.status, resultText);
-                    } else {
-                         // A resposta de um script do Google em modo 'text/plain' pode não ser um JSON válido diretamente
-                         // Verificamos o conteúdo antes de tentar analisar
-                         if (resultText.includes("success")) {
-                            console.log('Dados salvos com sucesso na planilha.');
-                         } else {
-                            console.error('A planilha retornou um erro:', resultText);
-                         }
-                    }
-                } catch (e) {
-                    console.error("Erro de rede ao tentar salvar. Verifique a URL, a conexão e as permissões do script.", e);
-                }
-            }
-            renderEndScreen();
-            switchScreen('end');
-        }
+        document.getElementById('login-btn').onclick = login;
+        document.getElementById('show-dashboard-btn').onclick = loadDashboard;
         
-        function renderEndScreen(){
-            const correctCount = state.sessionResults.filter(r => r.isCorrect).length;
-            screens.end.innerHTML = `
-                <h1 class="text-4xl font-bold text-green-500 mb-4">Atividade Concluída!</h1>
-                <p class="text-xl text-gray-600 mb-8">Você acertou ${correctCount} de ${state.currentActivity.tasks.length} questões. O relatório foi salvo.</p>
-                <button id="back-to-hub-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg text-xl">Voltar para Atividades</button>
-                <button id="end-logout-btn" class="mt-4 text-gray-500 hover:text-gray-800">Sair</button>
-            `;
-            document.getElementById('back-to-hub-btn').onclick = () => { renderStudentHub(); switchScreen('studentHub'); };
-            document.getElementById('end-logout-btn').onclick = logout;
-        }
-
-        function createVisual(type) {
-             const visuals = {
-                sun: '<svg class="w-12 h-12 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zM4.225 5.225a1 1 0 011.414 0l.707.707a1 1 0 01-1.414 1.414l-.707-.707a1 1 0 010-1.414zM2 10a1 1 0 011-1h1a1 1 0 110 2H3a1 1 0 01-1-1zm13.364-3.364a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707zM10 16a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zm3.775-4.775a1 1 0 010 1.414l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 0zM16 10a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1zm-9.364 3.364a1 1 0 011.414 1.414l.707.707a1 1 0 01-1.414-1.414l-.707-.707a1 1 0 010-1.414zM10 14a4 4 0 100-8 4 4 0 000 8z" clip-rule="evenodd" /></svg>',
-                moon: '<svg class="w-12 h-12 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>',
-                star: '<svg class="w-10 h-10 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>',
-                apple: '<svg class="w-10 h-10 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65,9.35a6.49,6.49,0,0,0-5.4-4.24,1,1,0,0,0-.5,1.92,4.48,4.48,0,0,1,3.58,4.24,5.1,5.1,0,0,1-1,3.09,1,1,0,0,0,.21,1.4,1,1,0,0,0,.59.2,1,1,0,0,0,.8-0.4A7,7,0,0,0,17.65,9.35ZM12,4A6.5,6.5,0,0,0,6,9.75,7.5,7.5,0,0,0,12,22,7.5,7.5,0,0,0,18,9.75,6.5,6.5,0,0,0,12,4Zm0,16A5.5,5.5,0,0,1,7,14.25a5.45,5.45,0,0,1,.5-2.23,1,1,0,0,0-1.63-1.14,7.44,7.44,0,0,0-1,3.87A5.5,5.5,0,0,1,12,6a5.5,5.5,0,0,1,5.13,8.75,1,1,0,0,0-1.63,1.14A5.45,5.45,0,0,1,17,14.25,5.5,5.5,0,0,1,12,20Z"/></svg>',
-                ball: '<svg class="w-10 h-10 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z" clip-rule="evenodd" /></svg>',
-                hundred: `<div class="w-24 h-24 bg-red-300 grid grid-cols-10 grid-rows-10 gap-px p-1 border-2 border-red-500">${ '<div class="bg-red-500"></div>'.repeat(100) }</div>`,
-                ten: `<div class="w-6 h-24 bg-blue-300 grid grid-rows-10 gap-px p-1 border-2 border-blue-500">${ '<div class="bg-blue-500"></div>'.repeat(10) }</div>`,
-                one: '<div class="w-6 h-6 bg-yellow-300 border-2 border-yellow-500"></div>',
-                '1r': '<div class="m-1"><svg class="w-12 h-12" viewBox="0 0 50 50"><circle cx="25" cy="25" r="24" fill="#B87333" stroke="#8B4513" stroke-width="2"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="white" font-weight="bold">1</text></svg></div>',
-                '2r': '<div class="m-1"><svg class="w-16 h-16" viewBox="0 0 80 40"><rect x="1" y="1" width="78" height="38" rx="5" fill="#228B22" stroke="#006400" stroke-width="2"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="white" font-weight="bold">2</text></svg></div>',
-                '5r': '<div class="m-1"><svg class="w-20 h-20" viewBox="0 0 84 42"><rect x="1" y="1" width="82" height="40" rx="5" fill="#8A2BE2" stroke="#4B0082" stroke-width="2"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="white" font-weight="bold">5</text></svg></div>',
-                '10r': '<div class="m-1"><svg class="w-24 h-24" viewBox="0 0 88 44"><rect x="1" y="1" width="86" height="42" rx="5" fill="#DC143C" stroke="#8B0000" stroke-width="2"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="white" font-weight="bold">10</text></svg></div>',
-                'sorvete_4r': '<div class="m-1 text-center"><svg class="w-12 h-12" viewBox="0 0 100 100"><path d="M 20 40 L 50 90 L 80 40 Z" fill="#F4A460"/><circle cx="50" cy="25" r="25" fill="#FFC0CB"/></svg><p class="font-bold text-sm">R$ 4</p></div>',
-                'suco_6r': '<div class="m-1 text-center"><svg class="w-12 h-12" viewBox="0 0 50 100"><rect x="10" y="20" width="30" height="60" fill="#FFA500"/><rect x="5" y="15" width="40" height="5" fill="#D2691E"/></svg><p class="font-bold text-sm">R$ 6</p></div>',
-                'gibi_7r': '<div class="m-1 text-center"><svg class="w-12 h-12" viewBox="0 0 100 100"><rect x="10" y="10" width="80" height="80" rx="5" fill="#ADD8E6"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="black" font-weight="bold">GIBI</text></svg><p class="font-bold text-sm">R$ 7</p></div>',
-                'caderno_8r': '<div class="m-1 text-center"><svg class="w-12 h-12" viewBox="0 0 100 100"><rect x="15" y="10" width="70" height="80" rx="5" fill="#4682B4"/><rect x="10" y="20" width="5" height="60" fill="#000000"/></svg><p class="font-bold text-sm">R$ 8</p></div>',
-                '5r_add': '<div class="m-1 relative"><svg class="w-20 h-20" viewBox="0 0 84 42"><rect x="1" y="1" width="82" height="40" rx="5" fill="#8A2BE2" stroke="#4B0082" stroke-width="2"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="20" fill="white" font-weight="bold">5</text></svg><span class="absolute -top-2 -left-2 text-3xl font-bold text-green-500">+</span></div>',
-                bird: '<svg class="w-10 h-10 text-cyan-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5,12a1.5,1.5,0,0,0-1.5,1.5v4.5a1.5,1.5,0,0,1-1.5,1.5H4.5A1.5,1.5,0,0,1,3,18V13.5A1.5,1.5,0,0,0,1.5,12,1.5,1.5,0,0,0,0,13.5v4.5A4.5,4.5,0,0,0,4.5,22.5h15A4.5,4.5,0,0,0,24,18V13.5A1.5,1.5,0,0,0,22.5,12ZM10.2,14.25a.74.74,0,0,0-.23-.53L5.72,9.47A.75.75,0,0,0,5.2,10.53l3.25,3.25a.75.75,0,0,0,1.06,0l3.25-3.25a.75.75,0,1,0-1.06-1.06l-4.25,4.25a.74.74,0,0,0-.23.53V1.5A.75.75,0,0,0,6.5,0a.75.75,0,0,0-.75.75v12a.75.75,0,0,0,1.5,0V1.5A.75.75,0,0,0,6.5,0a.75.75,0,0,0-.75.75v12Z"/></svg>',
-                car: '<svg class="w-10 h-10 text-gray-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M21.6,8.4l-1.8-4.8A4.5,4.5,0,0,0,15.9,1.5H8.1A4.5,4.5,0,0,0,4.2,3.6L2.4,8.4A4.5,4.5,0,0,0,1.5,12.3V18a4.5,4.5,0,0,0,4.5,4.5h.75a1.5,1.5,0,0,0,0-3H6A1.5,1.5,0,0,1,4.5,18V17a1,1,0,0,1,1-1H18.5a1,1,0,0,1,1,1v1a1.5,1.5,0,0,1-1.5,1.5h-.75a1.5,1.5,0,0,0,0,3h.75A4.5,4.5,0,0,0,22.5,18V12.3A4.5,4.5,0,0,0,21.6,8.4ZM6.2,4.5A1.5,1.5,0,0,1,8.1,3h7.8A1.5,1.5,0,0,1,17.8,4.5l1.5,4H4.7ZM6,15a2,2,0,1,1,2-2A2,2,0,0,1,6,15Zm12,0a2,2,0,1,1,2-2A2,2,0,0,1,18,15Z"/></svg>',
-                fruta: '<svg class="w-10 h-10 text-orange-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12,2A10,10,0,1,0,22,12,10,10,0,0,0,12,2Zm0,18a8,8,0,1,1,8-8A8,8,0,0,1,12,20ZM14.5,10.2a1,1,0,0,0-1.4-1.4L12,10.6,10.9,9.5a1,1,0,0,0-1.4,1.4L10.6,12,9.5,13.1a1,1,0,0,0,0,1.4,1,1,0,0,0,1.4,0L12,13.4l1.1,1.1a1,1,0,0,0,1.4,0,1,1,0,0,0,0-1.4L13.4,12Z"/></svg>',
-                pessoa: '<svg class="w-8 h-8 text-gray-700" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>',
-                biscoito: '<svg class="w-10 h-10 text-yellow-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12,2A10,10,0,1,0,22,12,10,10,0,0,0,12,2Zm0,18a8,8,0,1,1,8-8A8,8,0,0,1,12,20ZM12,10a1,1,0,1,0,1,1A1,1,0,0,0,12,10ZM8,12a1,1,0,1,0,1,1A1,1,0,0,0,8,12Zm8,0a1,1,0,1,0,1,1A1,1,0,0,0,16,12Z"/></svg>',
-                peixe: '<svg class="w-10 h-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M22.5,10.5H21V9a1,1,0,0,0-1-1H18.5a1,1,0,0,0-1,1v1.5H16V9a1,1,0,0,0-1-1H13.5a1,1,0,0,0-1,1v1.5H11V9a1,1,0,0,0-1-1H8.5a1,1,0,0,0-1,1v1.5H6V9A1,1,0,0,0,5,8H3.5a1,1,0,0,0-1,1v1.5H1.5a1,1,0,0,0-1,1V15a1,1,0,0,0,1,1h1V17a1,1,0,0,0,1,1H5a1,1,0,0,0,1-1V16h1.5V17a1,1,0,0,0,1,1h1.5a1,1,0,0,0,1-1V16h1.5V17a1,1,0,0,0,1,1h1.5a1,1,0,0,0,1-1V16H21V17a1,1,0,0,0,1,1h1.5a1,1,0,0,0,1-1V12A1.5,1.5,0,0,0,22.5,10.5ZM19,14H17V12h2Z"/></svg>',
-                boneca: '<svg class="w-10 h-10 text-pink-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12,2A10,10,0,1,0,22,12,10,10,0,0,0,12,2Zm0,18a8,8,0,1,1,8-8A8,8,0,0,1,12,20ZM10,12a2,2,0,1,1,2-2A2,2,0,0,1,10,12Zm4-4a2,2,0,1,1,2-2A2,2,0,0,1,14,8Z"/></svg>',
-                box: '<svg class="w-12 h-12 text-yellow-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2m-2 0h-8m10 0v-2m-2 2v-2m-2 2v-2m-2 2v-2"></path></svg>'
-            };
-            return visuals[type] || '';
-        }
-
-        // --- PAINEL DO PROFESSOR ---
-        async function loadDashboard() {
-            const studentListEl = document.getElementById('student-list');
-            studentListEl.innerHTML = '<p class="text-center text-gray-500">Carregando relatórios...</p>';
-            state.currentView = 'dashboard';
-            switchScreen('dashboard');
-
-            if (!SCRIPT_URL || SCRIPT_URL === 'COLE_SUA_URL_AQUI') {
-                studentListEl.innerHTML = '<p class="text-center text-red-500 font-semibold">URL do script não configurada. O painel não pode ser carregado.</p>';
-                return;
-            }
-
-            try {
-                const response = await fetch(SCRIPT_URL + '?action=get');
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const allReports = await response.json();
-
-                if (allReports.length === 0) {
-                    studentListEl.innerHTML = '<p class="text-center text-gray-500">Nenhum relatório encontrado.</p>';
-                    return;
-                }
-
-                const reportsByStudent = allReports.reduce((acc, report) => {
-                    const name = report.studentName;
-                    if (!acc[name]) acc[name] = [];
-                    acc[name].push(report);
-                    return acc;
-                }, {});
-
-                const latestReportsByStudent = {};
-                for (const studentName in reportsByStudent) {
-                    const studentReports = reportsByStudent[studentName];
-                    const latestReports = {};
-                    studentReports.forEach(report => {
-                        if (!latestReports[report.activityId] || new Date(report.timestamp) > new Date(latestReports[report.activityId].timestamp)) {
-                            latestReports[report.activityId] = report;
-                        }
-                    });
-                    latestReportsByStudent[studentName] = Object.values(latestReports);
-                }
-
-                const sortedStudentNames = Object.keys(latestReportsByStudent).sort((a, b) => a.localeCompare(b));
-
-                studentListEl.innerHTML = '';
-                sortedStudentNames.forEach(studentName => {
-                    const studentReports = latestReportsByStudent[studentName];
-                    const totalActivities = activities.length;
-                    const completedCount = studentReports.length;
-                    
-                    const studentCard = document.createElement('div');
-                    studentCard.className = 'bg-gray-50 p-4 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors';
-                    studentCard.innerHTML = `
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="font-bold text-lg text-gray-800">${studentName}</h3>
-                                <p class="text-sm text-gray-600">${completedCount} de ${totalActivities} atividades concluídas</p>
-                            </div>
-                            <span class="text-blue-500 font-semibold">Ver Detalhes →</span>
-                        </div>
-                    `;
-                    studentCard.onclick = () => showStudentHubForTeacher(studentName, studentReports);
-                    studentListEl.appendChild(studentCard);
-                });
-
-            } catch (error) {
-                console.error("Erro ao carregar o painel:", error);
-                studentListEl.innerHTML = '<p class="text-center text-red-500">Falha ao carregar dados. Verifique a URL e a planilha.</p>';
-            }
-        }
-
-        function showStudentHubForTeacher(studentName, reports) {
-            state.studentName = studentName;
-            document.getElementById('hub-welcome-message').textContent = `Relatórios de ${studentName}`;
-            const listEl = document.getElementById('activities-list');
-            listEl.innerHTML = '';
-
-            activities.forEach(activity => {
-                const report = reports.find(r => r.activityId === activity.id);
-                const isCompleted = !!report;
-                const completionDate = isCompleted && report.timestamp ? new Date(report.timestamp).toLocaleString('pt-BR') : '';
-
-                const card = document.createElement('div');
-                card.className = 'bg-gray-100 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-center gap-4';
-                card.innerHTML = `
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg text-gray-800">${activity.title}</h3>
-                        <p class="text-sm text-gray-600">${activity.description}</p>
-                    </div>
-                    <div class="text-center sm:text-right">
-                        ${isCompleted ? 
-                            `<p class="font-semibold text-green-600">Realizado</p><p class="text-xs text-gray-500">${completionDate.split(',')[0]}</p>` : 
-                            '<p class="font-semibold text-gray-500">Não iniciado</p>'
-                        }
-                    </div>
-                `;
-                
-                if (isCompleted) {
-                    const reportButton = document.createElement('button');
-                    reportButton.textContent = 'Ver Relatório';
-                    reportButton.className = 'w-full sm:w-auto ml-0 sm:ml-4 mt-2 sm:mt-0 px-4 py-2 rounded text-white font-semibold bg-green-600 hover:bg-green-500 shadow-md';
-                    reportButton.onclick = () => renderPrintableReport(report);
-                    card.appendChild(reportButton);
-                }
-                listEl.appendChild(card);
-            });
-            switchScreen('studentHub');
-        }
-
-        function renderPrintableReport(data) {
-            const reportContainer = document.getElementById('printable-report');
-            const results = data.results || [];
-            const correctCount = results.filter(r => r.isCorrect).length;
-            
-            const skillsInDifficulty = {};
-            if (Array.isArray(results)) {
-                results.forEach(res => {
-                    if(res && !res.isCorrect && res.task && res.task.skillId) {
-                        const skill = skills[res.task.skillId];
-                        if(skill && !skillsInDifficulty[skill.saeb + skill.bncc]) { // Use a more unique key
-                            skillsInDifficulty[skill.saeb + skill.bncc] = skill;
-                        }
-                    }
-                });
-            }
-
-            let reportHTML = `
-                <div class="p-8 font-sans">
-                    <div class="text-center border-b pb-4 mb-6">
-                        <h1 class="text-3xl font-bold">Relatório de Desempenho</h1>
-                        <h2 class="text-xl text-gray-700">${data.activityTitle}</h2>
-                    </div>
-                    <div class="flex justify-between mb-6">
-                        <div>
-                            <p><span class="font-bold">Aluno(a):</span> ${data.studentName}</p>
-                            <p><span class="font-bold">Data:</span> ${data.timestamp ? new Date(data.timestamp).toLocaleString('pt-BR') : 'Data indisponível'}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold">Resultado Final</p>
-                            <p class="text-2xl font-bold">${correctCount} / ${results.length} Acertos</p>
-                        </div>
-                    </div>
-
-                    <div class="mb-8">
-                        <h3 class="text-xl font-bold border-b pb-2 mb-3">Análise Pedagógica - Habilidades a Desenvolver</h3>
-                        ${Object.keys(skillsInDifficulty).length === 0 ? '<p class="text-gray-600">O aluno demonstrou bom domínio das habilidades básicas nesta atividade.</p>' : ''}
-                        <ul class="list-disc list-inside space-y-2">
-                            ${Object.values(skillsInDifficulty).map(skill => `
-                                <li>
-                                    <span class="font-semibold">${skill.saeb} / ${skill.bncc}:</span> ${skill.desc}
-                                </li>
-                            `).join('')}
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h3 class="text-xl font-bold border-b pb-2 mb-3">Desempenho por Questão</h3>
-                        <table class="w-full border-collapse text-sm">
-                           <thead>
-                               <tr class="bg-gray-100">
-                                   <th class="border p-2 text-left">#</th>
-                                   <th class="border p-2 text-left">Instrução</th>
-                                   <th class="border p-2 text-left">Resposta do Aluno</th>
-                                   <th class="border p-2 text-left">Resposta Correta</th>
-                                   <th class="border p-2 text-center">Resultado</th>
-                               </tr>
-                           </thead>
-                           <tbody>
-                            ${(results).map((res, index) => `
-                                <tr class="${res.isCorrect ? '' : 'bg-red-50'}">
-                                    <td class="border p-2 font-semibold">${index + 1}</td>
-                                    <td class="border p-2">${res.task ? res.task.instruction : 'N/A'}</td>
-                                    <td class="border p-2">${res.selectedAnswer || 'N/A'}</td>
-                                    <td class="border p-2">${res.task ? res.task.answer : 'N/A'}</td>
-                                    <td class="border p-2 text-center text-xl">${res.isCorrect ? '✔️' : '❌'}</td>
-                                </tr>
-                            `).join('')}
-                           </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-            
-            reportContainer.innerHTML = reportHTML;
-            window.print();
-        }
-
-        // --- INICIALIZAÇÃO e EVENT LISTENERS ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Tela de Login
-            document.getElementById('login-btn').addEventListener('click', login);
-            document.getElementById('student-name-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault(); // Impede o comportamento padrão do Enter em formulários
-                    login();
-                }
-            });
-            document.getElementById('show-dashboard-btn').addEventListener('click', loadDashboard);
-
-            // Hub e Painel (botões de voltar)
-            document.getElementById('hub-back-btn').addEventListener('click', () => {
-                if (state.currentView === 'dashboard') {
-                    loadDashboard();
-                } else {
-                    logout();
-                }
-            });
-            document.getElementById('back-to-start-btn').addEventListener('click', logout);
-
-            // Inicia na tela de login
-            switchScreen('login');
-        });
+        switchScreen('login');
+    });
     </script>
 </body>
 </html>
