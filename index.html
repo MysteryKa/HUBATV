@@ -388,7 +388,7 @@
             }, 1200);
         }
 
-        async function finishActivity() {
+       async function finishActivity() {
             if (SCRIPT_URL && SCRIPT_URL !== 'COLE_SUA_URL_AQUI') {
                 const payload = {
                     action: 'save',
@@ -401,23 +401,35 @@
                     }
                 };
 
+                console.log("Enviando para a planilha:", JSON.stringify(payload, null, 2));
+
                 try {
+                    // Usar 'text/plain' como Content-Type para evitar uma requisição "pre-flight" de CORS
                     const response = await fetch(SCRIPT_URL, {
                         method: 'POST',
+                        redirect: 'follow',
                         body: JSON.stringify(payload),
                         headers: {
-                            'Content-Type': 'application/json',
+                            'Content-Type': 'text/plain;charset=utf-8',
                         },
                     });
 
+                    const resultText = await response.text();
+                    console.log("Resposta da planilha:", resultText);
+
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('Falha ao salvar. Status:', response.status, errorText);
+                         console.error('Falha ao salvar. Status:', response.status, resultText);
                     } else {
-                        console.log('Dados enviados com sucesso.');
+                         // A resposta de um script do Google em modo 'text/plain' pode não ser um JSON válido diretamente
+                         // Verificamos o conteúdo antes de tentar analisar
+                         if (resultText.includes("success")) {
+                            console.log('Dados salvos com sucesso na planilha.');
+                         } else {
+                            console.error('A planilha retornou um erro:', resultText);
+                         }
                     }
                 } catch (e) {
-                    console.error("Erro de rede ao salvar a atividade:", e);
+                    console.error("Erro de rede ao tentar salvar. Verifique a URL, a conexão e as permissões do script.", e);
                 }
             }
             renderEndScreen();
@@ -681,5 +693,4 @@
     </script>
 </body>
 </html>
-
 
