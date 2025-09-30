@@ -305,7 +305,6 @@
         }
         
         function renderTask() {
-            // ... (rest of the functions remain the same)
             const task = state.currentActivity.tasks[state.currentTaskIndex];
             const instructionEl = document.getElementById('instruction-text');
             const taskContainer = document.getElementById('task-container');
@@ -392,27 +391,30 @@
         async function finishActivity() {
             if (SCRIPT_URL && SCRIPT_URL !== 'COLE_SUA_URL_AQUI') {
                 const payload = {
-                    studentName: state.studentName,
-                    activityId: state.currentActivity.id,
-                    activityTitle: state.currentActivity.title,
-                    results: JSON.stringify(state.sessionResults), // Stringify results for the sheet
-                    timestamp: new Date().toISOString(),
+                    action: 'save',
+                    data: {
+                        studentName: state.studentName,
+                        activityId: state.currentActivity.id,
+                        activityTitle: state.currentActivity.title,
+                        results: state.sessionResults,
+                        timestamp: new Date().toISOString(),
+                    }
                 };
-
-                const formData = new FormData();
-                formData.append('action', 'save');
-                formData.append('data', JSON.stringify(payload));
 
                 try {
                     const response = await fetch(SCRIPT_URL, {
                         method: 'POST',
-                        body: formData,
+                        body: JSON.stringify(payload),
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
                     });
 
                     if (!response.ok) {
-                        console.error('Falha ao salvar. Status:', response.status, await response.text());
+                        const errorText = await response.text();
+                        console.error('Falha ao salvar. Status:', response.status, errorText);
                     } else {
-                        console.log('Tentativa de salvar enviada com sucesso.');
+                        console.log('Dados enviados com sucesso.');
                     }
                 } catch (e) {
                     console.error("Erro de rede ao salvar a atividade:", e);
